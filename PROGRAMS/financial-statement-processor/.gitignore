@@ -1,0 +1,12 @@
+# Binaries
+financial-statement-processor
+financial-statement-query
+
+# Environment configuration
+.env
+
+# Logs
+*.log
+
+# Test files
+test_statements/
