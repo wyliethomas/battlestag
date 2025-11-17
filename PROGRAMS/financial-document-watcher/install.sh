@@ -74,6 +74,9 @@ if [[ ! $CONFIRM =~ ^[Yy]$ ]]; then
 fi
 
 echo ""
+echo -e "${GREEN}Installing Go dependencies...${NC}"
+go mod tidy
+
 echo -e "${GREEN}Building binary...${NC}"
 go build -o financial-document-watcher
 

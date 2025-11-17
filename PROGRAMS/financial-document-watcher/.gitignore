@@ -7,8 +7,5 @@ financial-document-watcher
 # Config (keep .example)
 watches.json
 
-# Go
-go.sum
-
 # Logs
 *.log
