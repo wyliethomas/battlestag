@@ -1,0 +1,23 @@
+# Financial Document Watcher - Cron Examples
+# Add to your crontab with: crontab -e
+
+# Run daily at 9 AM (good for overnight downloads)
+0 9 * * * /usr/local/bin/financial-document-watcher-run >> ~/.local/log/financial-watcher.log 2>&1
+
+# Run every hour (frequent monitoring)
+0 * * * * /usr/local/bin/financial-document-watcher-run >> ~/.local/log/financial-watcher.log 2>&1
+
+# Run every 30 minutes during business hours (9 AM - 5 PM)
+*/30 9-17 * * * /usr/local/bin/financial-document-watcher-run >> ~/.local/log/financial-watcher.log 2>&1
+
+# Run Monday-Friday at 9 AM and 5 PM
+0 9,17 * * 1-5 /usr/local/bin/financial-document-watcher-run >> ~/.local/log/financial-watcher.log 2>&1
+
+# Run every 15 minutes (near real-time)
+*/15 * * * * /usr/local/bin/financial-document-watcher-run >> ~/.local/log/financial-watcher.log 2>&1
+
+# Add file locking to prevent concurrent runs (recommended for frequent schedules)
+# */15 * * * * flock -n /tmp/financial-watcher.lock /usr/local/bin/financial-document-watcher-run >> ~/.local/log/financial-watcher.log 2>&1
+
+# Send email on errors (requires mail to be configured)
+# 0 9 * * * /usr/local/bin/financial-document-watcher-run >> ~/.local/log/financial-watcher.log 2>&1 || echo "Financial watcher failed" | mail -s "Watcher Error" user@example.com

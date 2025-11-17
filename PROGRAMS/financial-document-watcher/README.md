@@ -27,7 +27,33 @@ A Go CLI tool that monitors folders for financial documents and automatically tr
 - Go 1.16 or higher
 - SQLite3 (usually pre-installed on Linux/macOS)
 
-### Build from Source
+### Quick Installation (Recommended)
+
+After cloning/pulling the repository, simply run the interactive installer:
+
+```bash
+cd financial-document-watcher
+./install.sh
+```
+
+The installer will prompt you for:
+- Binary installation path (default: `/usr/local/bin`)
+- Configuration directory (default: `~/.config/financial-watcher`)
+- Database directory (default: `~/.local/share/financial-watcher`)
+- Log directory (default: `~/.local/log`)
+- Cron schedule (optional)
+
+The script will:
+1. Build the binary
+2. Install it to your chosen location
+3. Create all necessary directories
+4. Copy the example config for you to customize
+5. Create a wrapper script with the correct paths
+6. Optionally set up a cron job
+
+After installation, edit your watches.json and you're ready to go!
+
+### Manual Build from Source
 
 1. Navigate to the project directory:
 
