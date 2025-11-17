@@ -3,6 +3,7 @@ package parser
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -55,18 +56,18 @@ func ParseFile(filePath, ollamaHost, ollamaModel string) (*StatementData, error)
 
 // parsePDF extracts transaction data from a PDF bank statement
 func parsePDF(filePath, ollamaHost, ollamaModel string) (*StatementData, error) {
-	// Extract text from PDF
-	text, err := extractPDFText(filePath)
+	// Extract text from PDF page-by-page
+	pages, err := extractPDFTextByPage(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("extract PDF text: %w", err)
 	}
 
-	if strings.TrimSpace(text) == "" {
-		return nil, fmt.Errorf("PDF contains no text (may be a scanned image)")
+	if len(pages) == 0 {
+		return nil, fmt.Errorf("PDF contains no readable pages")
 	}
 
-	// Parse using LLM
-	return parseWithLLM(text, filePath, ollamaHost, ollamaModel)
+	// Parse each page with LLM and merge results
+	return parseMultiPageWithLLM(pages, filePath, ollamaHost, ollamaModel)
 }
 
 // extractPDFText extracts all text content from a PDF file
@@ -89,24 +90,82 @@ func extractPDFText(filePath string) (string, error) {
 
 	var fullText strings.Builder
 	numPages := pdfReader.NumPage()
+	log.Printf("PDF has %d pages", numPages)
 
+	pagesProcessed := 0
 	for pageNum := 1; pageNum <= numPages; pageNum++ {
 		page := pdfReader.Page(pageNum)
 		if page.V.IsNull() {
+			log.Printf("WARNING: Page %d is null, skipping", pageNum)
 			continue
 		}
 
 		text, err := page.GetPlainText(nil)
 		if err != nil {
 			// Continue with other pages if one fails
+			log.Printf("WARNING: Failed to extract text from page %d: %v", pageNum, err)
 			continue
 		}
 
 		fullText.WriteString(text)
 		fullText.WriteString("\n")
+		pagesProcessed++
 	}
 
-	return fullText.String(), nil
+	extractedText := fullText.String()
+	log.Printf("Successfully extracted text from %d/%d pages (%d characters total)",
+		pagesProcessed, numPages, len(extractedText))
+
+	return extractedText, nil
+}
+
+// extractPDFTextByPage extracts text from each page of a PDF separately
+func extractPDFTextByPage(filePath string) ([]string, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("open PDF: %w", err)
+	}
+	defer f.Close()
+
+	fileInfo, err := f.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("stat PDF: %w", err)
+	}
+
+	pdfReader, err := pdf.NewReader(f, fileInfo.Size())
+	if err != nil {
+		return nil, fmt.Errorf("create PDF reader: %w", err)
+	}
+
+	numPages := pdfReader.NumPage()
+	log.Printf("PDF has %d pages, extracting page-by-page", numPages)
+
+	pages := make([]string, 0, numPages)
+
+	for pageNum := 1; pageNum <= numPages; pageNum++ {
+		page := pdfReader.Page(pageNum)
+		if page.V.IsNull() {
+			log.Printf("WARNING: Page %d is null, skipping", pageNum)
+			continue
+		}
+
+		text, err := page.GetPlainText(nil)
+		if err != nil {
+			log.Printf("WARNING: Failed to extract text from page %d: %v", pageNum, err)
+			continue
+		}
+
+		if strings.TrimSpace(text) == "" {
+			log.Printf("WARNING: Page %d contains no text, skipping", pageNum)
+			continue
+		}
+
+		log.Printf("Extracted page %d (%d characters)", pageNum, len(text))
+		pages = append(pages, text)
+	}
+
+	log.Printf("Successfully extracted %d/%d pages", len(pages), numPages)
+	return pages, nil
 }
 
 // parseImage extracts transaction data from an image using OCR
@@ -116,8 +175,79 @@ func parseImage(filePath, ollamaHost, ollamaModel string) (*StatementData, error
 	return nil, fmt.Errorf("image OCR not yet implemented - please convert to PDF or use tesseract manually")
 }
 
+// parseMultiPageWithLLM processes each page separately with LLM and merges results
+func parseMultiPageWithLLM(pages []string, sourceFile, ollamaHost, ollamaModel string) (*StatementData, error) {
+	log.Printf("Processing %d pages with LLM (page-by-page to avoid context limits)", len(pages))
+
+	var allTransactions []*db.Transaction
+	var statementData *StatementData
+
+	for i, pageText := range pages {
+		pageNum := i + 1
+		log.Printf("Processing page %d...", pageNum)
+
+		// Parse this page with LLM
+		pageData, err := parseWithLLM(pageText, sourceFile, ollamaHost, ollamaModel)
+		if err != nil {
+			log.Printf("WARNING: Failed to parse page %d: %v", pageNum, err)
+			continue
+		}
+
+		// Use account info and statement date from the first successfully parsed page
+		if statementData == nil {
+			statementData = &StatementData{
+				AccountName:   pageData.AccountName,
+				AccountLast4:  pageData.AccountLast4,
+				StatementDate: pageData.StatementDate,
+				Transactions:  make([]*db.Transaction, 0),
+			}
+			log.Printf("Using account info from page %d: %s (...%s)", pageNum, pageData.AccountName, pageData.AccountLast4)
+		}
+
+		// Collect transactions from this page
+		log.Printf("Page %d contributed %d transactions", pageNum, len(pageData.Transactions))
+		allTransactions = append(allTransactions, pageData.Transactions...)
+	}
+
+	if statementData == nil {
+		return nil, fmt.Errorf("failed to parse any pages successfully")
+	}
+
+	// Deduplicate transactions (in case pages had overlapping content)
+	statementData.Transactions = deduplicateTransactions(allTransactions)
+	log.Printf("Total transactions after deduplication: %d (removed %d duplicates)",
+		len(statementData.Transactions), len(allTransactions)-len(statementData.Transactions))
+
+	return statementData, nil
+}
+
+// deduplicateTransactions removes duplicate transactions based on unique key
+// (account_last4, transaction_date, description, amount)
+func deduplicateTransactions(transactions []*db.Transaction) []*db.Transaction {
+	seen := make(map[string]bool)
+	unique := make([]*db.Transaction, 0, len(transactions))
+
+	for _, tx := range transactions {
+		// Create unique key matching database UNIQUE constraint
+		key := fmt.Sprintf("%s|%s|%s|%.2f",
+			tx.AccountLast4,
+			tx.TransactionDate.Format("2006-01-02"),
+			tx.Description,
+			tx.Amount)
+
+		if !seen[key] {
+			seen[key] = true
+			unique = append(unique, tx)
+		}
+	}
+
+	return unique
+}
+
 // parseWithLLM sends extracted text to local LLM for structured parsing
 func parseWithLLM(text, sourceFile, ollamaHost, ollamaModel string) (*StatementData, error) {
+	log.Printf("Sending %d characters to LLM for parsing", len(text))
+
 	// Create LLM client
 	client := NewOllamaClient(ollamaHost, ollamaModel)
 
@@ -132,11 +262,15 @@ func parseWithLLM(text, sourceFile, ollamaHost, ollamaModel string) (*StatementD
 		return nil, fmt.Errorf("LLM parsing failed: %w", err)
 	}
 
+	log.Printf("Received LLM response (%d characters)", len(responseJSON))
+
 	// Parse LLM response
 	var llmResp LLMStatementResponse
 	if err := json.Unmarshal([]byte(responseJSON), &llmResp); err != nil {
 		return nil, fmt.Errorf("parse LLM response as JSON: %w\nResponse was: %s", err, responseJSON)
 	}
+
+	log.Printf("LLM extracted %d transactions", len(llmResp.Transactions))
 
 	// Convert to StatementData
 	statementDate, err := parseDate(llmResp.StatementDate)
