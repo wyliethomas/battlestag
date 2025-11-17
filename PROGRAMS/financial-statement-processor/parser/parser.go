@@ -188,13 +188,15 @@ func parseWithLLM(text, sourceFile, ollamaHost, ollamaModel string) (*StatementD
 func parseDate(dateStr string) (time.Time, error) {
 	// Common date formats in bank statements
 	formats := []string{
-		"2006-01-02",
-		"01/02/2006",
-		"1/2/2006",
-		"01/02/06",
-		"Jan 02, 2006",
-		"January 02, 2006",
-		"2006-01-02T15:04:05Z07:00",
+		"2006-01-02",                // YYYY-MM-DD (preferred)
+		"01/02/2006",                // MM/DD/YYYY
+		"1/2/2006",                  // M/D/YYYY
+		"01/02/06",                  // MM/DD/YY
+		"Jan 02, 2006",              // Mon DD, YYYY
+		"January 02, 2006",          // Month DD, YYYY
+		"2006-01-02T15:04:05Z07:00", // ISO 8601 with timezone
+		"06-01-02",                  // YY-MM-DD (defensive fallback for LLM output like "25-10-01")
+		"06/01/02",                  // YY/MM/DD (defensive fallback)
 	}
 
 	for _, format := range formats {

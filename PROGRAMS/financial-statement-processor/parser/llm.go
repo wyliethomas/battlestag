@@ -115,11 +115,11 @@ Required JSON structure:
 {
   "account_name": "Account holder name or account type",
   "account_last4": "Last 4 digits of account number",
-  "statement_date": "YYYY-MM-DD format",
+  "statement_date": "ISO 8601 date in YYYY-MM-DD format (e.g., 2025-10-01, NOT 25-10-01)",
   "transactions": [
     {
-      "transaction_date": "YYYY-MM-DD",
-      "post_date": "YYYY-MM-DD or null",
+      "transaction_date": "ISO 8601 date in YYYY-MM-DD format (e.g., 2025-10-15, NOT 25-10-15)",
+      "post_date": "ISO 8601 date in YYYY-MM-DD format or null (e.g., 2025-10-16, NOT 25-10-16)",
       "description": "Transaction description",
       "amount": -50.25,
       "transaction_type": "debit",
@@ -131,7 +131,7 @@ Required JSON structure:
 Rules:
 - transaction_type must be "debit" or "credit"
 - amount should be negative for debits (money out), positive for credits (money in)
-- dates must be in YYYY-MM-DD format
+- dates MUST be in YYYY-MM-DD format with 4-digit year (e.g., 2025-10-01). Never use 2-digit years like 25-10-01.
 - balance can be null if not shown
 - post_date can be null if not shown
 - Extract ALL transactions you can find
