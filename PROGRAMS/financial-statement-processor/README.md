@@ -92,11 +92,22 @@ cp .env.example .env
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DB_PATH` | `./transactions.db` | SQLite database file path |
+| `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL for LLM parsing |
+| `OLLAMA_MODEL` | `dolphin3` | LLM model to use for parsing |
 
 The `DB_PATH` can be:
 - Relative path: `./transactions.db`
 - Absolute path: `/home/user/data/transactions.db`
 - Home directory: `~/.local/share/financial-processor/transactions.db`
+
+### Ollama Setup
+
+This processor uses your local Ollama LLM to parse bank statements. Make sure:
+1. **Ollama is installed and running** on your network
+2. **Your model is downloaded**: `ollama pull dolphin3`
+3. **Ollama is accessible** at the configured host
+
+The LLM approach allows parsing statements from multiple banks without custom regex for each format!
 
 ### Database Schema
 
@@ -202,36 +213,32 @@ The watcher will:
 4. Move file to processed folder on success
 5. Leave file in place on failure for retry
 
-## Implementing Parser Logic
+## How Parser Logic Works
 
-The current implementation includes placeholder parsing functions. You need to add bank-specific parsing logic.
+The processor uses **LLM-based intelligent parsing** to handle bank statements from multiple banks without requiring custom regex patterns for each format. This approach provides flexibility and privacy.
 
-### PDF Parsing
+### Architecture
 
-Edit `parser/parser.go` and implement `parsePDF()`:
+The parsing pipeline has three stages:
 
-**Recommended libraries:**
-- `github.com/ledongthuc/pdf` - Simple text extraction
-- `github.com/pdfcpu/pdfcpu` - Advanced PDF operations
-- `github.com/unidoc/unipdf` - Commercial-grade PDF parsing
+1. **Text Extraction**: Extract raw text from PDF files using `github.com/ledongthuc/pdf`
+2. **LLM Processing**: Send text to your local Ollama LLM for intelligent parsing
+3. **Data Conversion**: Convert LLM's JSON response to database transactions
 
-**Example:**
+### PDF Text Extraction
+
+The parser extracts text from all pages of the PDF:
 
 ```go
-import "github.com/ledongthuc/pdf"
-
-func parsePDF(filePath string) (*StatementData, error) {
+// parser/parser.go - extractPDFText()
+func extractPDFText(filePath string) (string, error) {
     f, err := os.Open(filePath)
     if err != nil {
-        return nil, err
+        return "", err
     }
     defer f.Close()
 
-    fileInfo, _ := f.Stat()
     pdfReader, err := pdf.NewReader(f, fileInfo.Size())
-    if err != nil {
-        return nil, err
-    }
 
     var fullText strings.Builder
     for pageNum := 1; pageNum <= pdfReader.NumPage(); pageNum++ {
@@ -240,57 +247,103 @@ func parsePDF(filePath string) (*StatementData, error) {
         fullText.WriteString(text)
     }
 
-    return parseStatementText(fullText.String(), filePath)
+    return fullText.String(), nil
 }
 ```
 
-### OCR for Images
+### LLM-Based Parsing
 
-Edit `parser/parser.go` and implement `parseImage()`:
-
-**Requirements:**
-1. Install Tesseract: `apt-get install tesseract-ocr`
-2. Add library: `go get github.com/otiai10/gosseract/v2`
-
-**Example:**
+The extracted text is sent to your local Ollama instance with a structured prompt requesting JSON output:
 
 ```go
-import "github.com/otiai10/gosseract/v2"
+// parser/llm.go - OllamaClient.ParseStatementText()
+prompt := `You are a financial document parser. Extract transaction data from this bank statement.
 
-func parseImage(filePath string) (*StatementData, error) {
-    client := gosseract.NewClient()
-    defer client.Close()
-
-    client.SetImage(filePath)
-    text, err := client.Text()
-    if err != nil {
-        return nil, err
+Return ONLY valid JSON with this structure:
+{
+  "account_name": "Account Name",
+  "account_last4": "1234",
+  "statement_date": "2024-01-31",
+  "transactions": [
+    {
+      "transaction_date": "2024-01-15",
+      "post_date": "2024-01-16",
+      "description": "PURCHASE AT STORE",
+      "amount": -52.34,
+      "transaction_type": "debit",
+      "balance": 1247.66
     }
+  ]
+}
 
-    return parseStatementText(text, filePath)
+Statement text:
+` + text
+```
+
+The LLM analyzes the statement layout and extracts:
+- Account name and last 4 digits
+- Statement date
+- Each transaction with date, description, amount, type, and balance
+
+**Why LLM over regex?**
+- Works with multiple bank formats without custom code
+- Handles layout variations automatically
+- Extracts context (distinguishes debits from credits)
+- Fully private - runs on your local network
+
+### Data Validation
+
+After LLM parsing, the processor validates the extracted data:
+
+```go
+// parser/parser.go - ValidateStatementData()
+func ValidateStatementData(data *StatementData) error {
+    // Ensures account name and last4 are present
+    // Validates statement date is set
+    // Confirms transactions were found
+    // Checks each transaction has required fields
+    // Validates transaction types are "debit" or "credit"
 }
 ```
 
-### Text Parsing
+### Image/Scanned PDF Support
 
-Implement `parseStatementText()` with bank-specific regex patterns:
+For scanned PDFs or image files, OCR is needed but not yet implemented:
 
 ```go
-func parseStatementText(text, sourceFile string) (*StatementData, error) {
-    // Extract account info
-    accountPattern := regexp.MustCompile(`Account ending in (\d{4})`)
-    accountMatch := accountPattern.FindStringSubmatch(text)
-
-    // Extract statement date
-    datePattern := regexp.MustCompile(`Statement Date:\s*(\d{1,2}/\d{1,2}/\d{4})`)
-    dateMatch := datePattern.FindStringSubmatch(text)
-
-    // Extract transactions
-    txPattern := regexp.MustCompile(`(\d{1,2}/\d{1,2})\s+(.+?)\s+([\-\$\d,\.]+)\s+([\$\d,\.]+)`)
-    txMatches := txPattern.FindAllStringSubmatch(text, -1)
-
-    // Parse and build StatementData...
+// parser/parser.go - parseImage()
+func parseImage(filePath string) (*StatementData, error) {
+    return nil, fmt.Errorf("image OCR not yet implemented")
 }
+```
+
+To add OCR support:
+1. Install Tesseract: `apt-get install tesseract-ocr`
+2. Add Go library: `go get github.com/otiai10/gosseract/v2`
+3. Implement OCR text extraction in `parseImage()`
+4. Pass extracted text to same LLM pipeline
+
+### Customizing the LLM Prompt
+
+If the parser isn't extracting data correctly for your bank, you can adjust the prompt in `parser/llm.go`:
+
+```go
+func buildStatementPrompt(text string) string {
+    // Modify this prompt to give more specific instructions
+    // or examples for your bank's statement format
+}
+```
+
+### Supported Models
+
+The processor works with any Ollama model that can understand structured output. Tested with:
+- `dolphin3` (default) - Good balance of speed and accuracy
+- `mistral` - Fast, works for simpler formats
+- `llama3` - More accurate for complex layouts
+
+Change model in `.env`:
+```bash
+OLLAMA_MODEL=mistral
 ```
 
 ## Database Management

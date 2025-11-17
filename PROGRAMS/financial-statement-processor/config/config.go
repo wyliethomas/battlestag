@@ -6,21 +6,22 @@ import (
 	"path/filepath"
 )
 
-// Config holds the database configuration
+// Config holds the application configuration
 type Config struct {
-	DBPath string
+	DBPath      string
+	OllamaHost  string
+	OllamaModel string
 }
 
-const defaultDBPath = "./transactions.db"
+const (
+	defaultDBPath      = "./transactions.db"
+	defaultOllamaHost  = "http://localhost:11434"
+	defaultOllamaModel = "dolphin3"
+)
 
 // LoadFromEnv loads configuration from environment variables
 func LoadFromEnv() (*Config, error) {
-	dbPath := os.Getenv("DB_PATH")
-
-	// If not set, use default
-	if dbPath == "" {
-		dbPath = defaultDBPath
-	}
+	dbPath := getEnv("DB_PATH", defaultDBPath)
 
 	// Expand ~ to home directory if present
 	if len(dbPath) > 0 && dbPath[0] == '~' {
@@ -31,14 +32,16 @@ func LoadFromEnv() (*Config, error) {
 		dbPath = filepath.Join(home, dbPath[1:])
 	}
 
-	// Ensure directory exists
+	// Ensure database directory exists
 	dbDir := filepath.Dir(dbPath)
 	if err := os.MkdirAll(dbDir, 0755); err != nil {
 		return nil, fmt.Errorf("create database directory: %w", err)
 	}
 
 	cfg := &Config{
-		DBPath: dbPath,
+		DBPath:      dbPath,
+		OllamaHost:  getEnv("OLLAMA_HOST", defaultOllamaHost),
+		OllamaModel: getEnv("OLLAMA_MODEL", defaultOllamaModel),
 	}
 
 	return cfg, nil
@@ -47,4 +50,12 @@ func LoadFromEnv() (*Config, error) {
 // DatabasePath returns the database file path
 func (c *Config) DatabasePath() string {
 	return c.DBPath
+}
+
+// getEnv retrieves an environment variable or returns a default value
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }

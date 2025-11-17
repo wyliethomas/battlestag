@@ -34,7 +34,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nEnvironment Variables:\n")
-		fmt.Fprintf(os.Stderr, "  DB_PATH      SQLite database file path (default: ./transactions.db)\n\n")
+		fmt.Fprintf(os.Stderr, "  DB_PATH       SQLite database file path (default: ./transactions.db)\n")
+		fmt.Fprintf(os.Stderr, "  OLLAMA_HOST   Ollama server URL (default: http://localhost:11434)\n")
+		fmt.Fprintf(os.Stderr, "  OLLAMA_MODEL  LLM model for parsing (default: dolphin3)\n\n")
 		fmt.Fprintf(os.Stderr, "Exit Codes:\n")
 		fmt.Fprintf(os.Stderr, "  0 - Success\n")
 		fmt.Fprintf(os.Stderr, "  1 - Parse error\n")
@@ -88,7 +90,8 @@ func main() {
 
 	// Parse the statement file
 	log.Printf("Parsing statement file...")
-	statementData, err := parser.ParseFile(filePath)
+	log.Printf("Using Ollama at %s with model %s", cfg.OllamaHost, cfg.OllamaModel)
+	statementData, err := parser.ParseFile(filePath, cfg.OllamaHost, cfg.OllamaModel)
 	if err != nil {
 		log.Printf("ERROR: Failed to parse file: %v", err)
 

@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,6 +9,8 @@ import (
 	"time"
 
 	"financial-statement-processor/db"
+
+	"github.com/ledongthuc/pdf"
 )
 
 // StatementData represents parsed statement information
@@ -18,130 +21,180 @@ type StatementData struct {
 	Transactions  []*db.Transaction
 }
 
-// ParseFile parses a bank statement file (PDF or image)
-func ParseFile(filePath string) (*StatementData, error) {
+// LLMStatementResponse represents the JSON structure expected from the LLM
+type LLMStatementResponse struct {
+	AccountName   string           `json:"account_name"`
+	AccountLast4  string           `json:"account_last4"`
+	StatementDate string           `json:"statement_date"`
+	Transactions  []LLMTransaction `json:"transactions"`
+}
+
+// LLMTransaction represents a transaction as returned by the LLM
+type LLMTransaction struct {
+	TransactionDate string   `json:"transaction_date"`
+	PostDate        *string  `json:"post_date"`
+	Description     string   `json:"description"`
+	Amount          float64  `json:"amount"`
+	TransactionType string   `json:"transaction_type"`
+	Balance         *float64 `json:"balance"`
+}
+
+// ParseFile parses a bank statement file (PDF or image) using local LLM
+func ParseFile(filePath, ollamaHost, ollamaModel string) (*StatementData, error) {
 	ext := strings.ToLower(filepath.Ext(filePath))
 
 	switch ext {
 	case ".pdf":
-		return parsePDF(filePath)
+		return parsePDF(filePath, ollamaHost, ollamaModel)
 	case ".jpg", ".jpeg", ".png", ".tiff", ".tif":
-		return parseImage(filePath)
+		return parseImage(filePath, ollamaHost, ollamaModel)
 	default:
 		return nil, fmt.Errorf("unsupported file type: %s (supported: PDF, JPG, PNG, TIFF)", ext)
 	}
 }
 
 // parsePDF extracts transaction data from a PDF bank statement
-func parsePDF(filePath string) (*StatementData, error) {
-	// TODO: Implement PDF parsing
-	// Recommended libraries:
-	// - github.com/ledongthuc/pdf for simple text extraction
-	// - github.com/pdfcpu/pdfcpu for more advanced PDF operations
-	// - github.com/unidoc/unipdf for commercial-grade PDF parsing
+func parsePDF(filePath, ollamaHost, ollamaModel string) (*StatementData, error) {
+	// Extract text from PDF
+	text, err := extractPDFText(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("extract PDF text: %w", err)
+	}
 
-	// Example structure:
-	// 1. Extract text from PDF
-	// 2. Identify account information (name, last 4 digits)
-	// 3. Find statement date
-	// 4. Parse transaction lines using regex patterns
-	// 5. Extract: date, description, amount, type (debit/credit), balance
+	if strings.TrimSpace(text) == "" {
+		return nil, fmt.Errorf("PDF contains no text (may be a scanned image)")
+	}
 
-	// For now, return a placeholder error
-	return nil, fmt.Errorf("PDF parsing not yet implemented - please add PDF library and parsing logic")
+	// Parse using LLM
+	return parseWithLLM(text, filePath, ollamaHost, ollamaModel)
+}
 
-	// Example implementation outline:
-	/*
-		// Open PDF file
-		f, err := os.Open(filePath)
+// extractPDFText extracts all text content from a PDF file
+func extractPDFText(filePath string) (string, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return "", fmt.Errorf("open PDF: %w", err)
+	}
+	defer f.Close()
+
+	fileInfo, err := f.Stat()
+	if err != nil {
+		return "", fmt.Errorf("stat PDF: %w", err)
+	}
+
+	pdfReader, err := pdf.NewReader(f, fileInfo.Size())
+	if err != nil {
+		return "", fmt.Errorf("create PDF reader: %w", err)
+	}
+
+	var fullText strings.Builder
+	numPages := pdfReader.NumPage()
+
+	for pageNum := 1; pageNum <= numPages; pageNum++ {
+		page := pdfReader.Page(pageNum)
+		if page.V.IsNull() {
+			continue
+		}
+
+		text, err := page.GetPlainText(nil)
 		if err != nil {
-			return nil, fmt.Errorf("open PDF: %w", err)
-		}
-		defer f.Close()
-
-		// Read PDF content
-		pdfReader, err := pdf.NewReader(f, fileInfo.Size())
-		if err != nil {
-			return nil, fmt.Errorf("read PDF: %w", err)
+			// Continue with other pages if one fails
+			continue
 		}
 
-		// Extract text from all pages
-		var fullText strings.Builder
-		for pageNum := 1; pageNum <= pdfReader.NumPage(); pageNum++ {
-			page := pdfReader.Page(pageNum)
-			text, err := page.GetPlainText(nil)
-			if err != nil {
-				return nil, fmt.Errorf("extract text from page %d: %w", pageNum, err)
-			}
-			fullText.WriteString(text)
-		}
+		fullText.WriteString(text)
+		fullText.WriteString("\n")
+	}
 
-		// Parse the extracted text
-		return parseStatementText(fullText.String(), filePath)
-	*/
+	return fullText.String(), nil
 }
 
 // parseImage extracts transaction data from an image using OCR
-func parseImage(filePath string) (*StatementData, error) {
+func parseImage(filePath, ollamaHost, ollamaModel string) (*StatementData, error) {
 	// TODO: Implement OCR parsing
-	// Recommended approach:
-	// - Use gosseract (Go bindings for Tesseract OCR)
-	// - Install Tesseract: apt-get install tesseract-ocr
-	// - Library: github.com/otiai10/gosseract/v2
+	// For now, return error suggesting PDF conversion
+	return nil, fmt.Errorf("image OCR not yet implemented - please convert to PDF or use tesseract manually")
+}
 
-	// For now, return a placeholder error
-	return nil, fmt.Errorf("OCR parsing not yet implemented - please install Tesseract and add gosseract library")
+// parseWithLLM sends extracted text to local LLM for structured parsing
+func parseWithLLM(text, sourceFile, ollamaHost, ollamaModel string) (*StatementData, error) {
+	// Create LLM client
+	client := NewOllamaClient(ollamaHost, ollamaModel)
 
-	// Example implementation outline:
-	/*
-		client := gosseract.NewClient()
-		defer client.Close()
+	// Health check
+	if err := client.HealthCheck(); err != nil {
+		return nil, fmt.Errorf("ollama health check failed: %w (make sure Ollama is running at %s)", err, ollamaHost)
+	}
 
-		// Set image file
-		client.SetImage(filePath)
+	// Send to LLM for parsing
+	responseJSON, err := client.ParseStatementText(text)
+	if err != nil {
+		return nil, fmt.Errorf("LLM parsing failed: %w", err)
+	}
 
-		// Get text from image
-		text, err := client.Text()
+	// Parse LLM response
+	var llmResp LLMStatementResponse
+	if err := json.Unmarshal([]byte(responseJSON), &llmResp); err != nil {
+		return nil, fmt.Errorf("parse LLM response as JSON: %w\nResponse was: %s", err, responseJSON)
+	}
+
+	// Convert to StatementData
+	statementDate, err := parseDate(llmResp.StatementDate)
+	if err != nil {
+		return nil, fmt.Errorf("parse statement date '%s': %w", llmResp.StatementDate, err)
+	}
+
+	data := &StatementData{
+		AccountName:   llmResp.AccountName,
+		AccountLast4:  llmResp.AccountLast4,
+		StatementDate: statementDate,
+		Transactions:  make([]*db.Transaction, 0, len(llmResp.Transactions)),
+	}
+
+	// Convert LLM transactions to db.Transaction
+	for i, llmTx := range llmResp.Transactions {
+		txDate, err := parseDate(llmTx.TransactionDate)
 		if err != nil {
-			return nil, fmt.Errorf("OCR failed: %w", err)
+			return nil, fmt.Errorf("transaction %d: parse date '%s': %w", i, llmTx.TransactionDate, err)
 		}
 
-		// Parse the extracted text
-		return parseStatementText(text, filePath)
-	*/
+		tx := &db.Transaction{
+			AccountName:     llmResp.AccountName,
+			AccountLast4:    llmResp.AccountLast4,
+			TransactionDate: txDate,
+			Description:     llmTx.Description,
+			Amount:          llmTx.Amount,
+			TransactionType: llmTx.TransactionType,
+			Balance:         llmTx.Balance,
+			StatementDate:   statementDate,
+			SourceFile:      filepath.Base(sourceFile),
+		}
+
+		// Parse post date if provided
+		if llmTx.PostDate != nil && *llmTx.PostDate != "" {
+			postDate, err := parseDate(*llmTx.PostDate)
+			if err == nil {
+				tx.PostDate = &postDate
+			}
+		}
+
+		data.Transactions = append(data.Transactions, tx)
+	}
+
+	return data, nil
 }
 
-// parseStatementText parses extracted text to identify transactions
-func parseStatementText(text, sourceFile string) (*StatementData, error) {
-	// TODO: Implement text parsing logic
-	// This is highly bank-specific and will need customization
-
-	// Common patterns to extract:
-	// 1. Account name: often appears as "Account Holder: JOHN DOE" or similar
-	// 2. Account number: last 4 digits, often "Account ending in 1234"
-	// 3. Statement date: "Statement Date: 10/31/2024" or similar
-	// 4. Transaction lines: typically formatted as:
-	//    DATE    DESCRIPTION                      AMOUNT    BALANCE
-	//    10/15   PURCHASE AT STORE NAME          -50.00    1,234.56
-
-	// Example regex patterns (adjust for your bank's format):
-	// accountPattern := regexp.MustCompile(`Account ending in (\d{4})`)
-	// statementDatePattern := regexp.MustCompile(`Statement Date:\s*(\d{1,2}/\d{1,2}/\d{4})`)
-	// transactionPattern := regexp.MustCompile(`(\d{1,2}/\d{1,2})\s+([A-Z0-9\s\-\.]+?)\s+([\-\$\d,\.]+)\s+([\$\d,\.]+)`)
-
-	return nil, fmt.Errorf("text parsing not implemented - add bank-specific parsing logic")
-}
-
-// Example helper function for parsing dates
+// parseDate attempts to parse a date string in common formats
 func parseDate(dateStr string) (time.Time, error) {
 	// Common date formats in bank statements
 	formats := []string{
+		"2006-01-02",
 		"01/02/2006",
 		"1/2/2006",
 		"01/02/06",
-		"2006-01-02",
 		"Jan 02, 2006",
 		"January 02, 2006",
+		"2006-01-02T15:04:05Z07:00",
 	}
 
 	for _, format := range formats {
@@ -151,37 +204,6 @@ func parseDate(dateStr string) (time.Time, error) {
 	}
 
 	return time.Time{}, fmt.Errorf("unable to parse date: %s", dateStr)
-}
-
-// Example helper function for parsing amounts
-func parseAmount(amountStr string) (float64, error) {
-	// Remove currency symbols and commas
-	cleaned := strings.ReplaceAll(amountStr, "$", "")
-	cleaned = strings.ReplaceAll(cleaned, ",", "")
-	cleaned = strings.TrimSpace(cleaned)
-
-	var amount float64
-	_, err := fmt.Sscanf(cleaned, "%f", &amount)
-	if err != nil {
-		return 0, fmt.Errorf("parse amount: %w", err)
-	}
-
-	return amount, nil
-}
-
-// DetermineTransactionType determines if a transaction is debit or credit
-func DetermineTransactionType(amount float64, amountStr string) string {
-	// Check if amount string contains negative sign or parentheses
-	if strings.Contains(amountStr, "-") || strings.Contains(amountStr, "(") {
-		return "debit"
-	}
-
-	// Some banks use positive for credits, negative for debits
-	if amount < 0 {
-		return "debit"
-	}
-
-	return "credit"
 }
 
 // ValidateStatementData validates parsed statement data
@@ -195,7 +217,7 @@ func ValidateStatementData(data *StatementData) error {
 	}
 
 	if len(data.AccountLast4) != 4 {
-		return fmt.Errorf("account last 4 must be exactly 4 digits")
+		return fmt.Errorf("account last 4 must be exactly 4 digits, got: %s", data.AccountLast4)
 	}
 
 	if data.StatementDate.IsZero() {
@@ -215,7 +237,7 @@ func ValidateStatementData(data *StatementData) error {
 			return fmt.Errorf("transaction %d: transaction date is required", i)
 		}
 		if tx.TransactionType != "debit" && tx.TransactionType != "credit" {
-			return fmt.Errorf("transaction %d: type must be 'debit' or 'credit'", i)
+			return fmt.Errorf("transaction %d: type must be 'debit' or 'credit', got: %s", i, tx.TransactionType)
 		}
 	}
 
