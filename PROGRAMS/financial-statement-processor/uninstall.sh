@@ -54,6 +54,19 @@ fi
 if [ -d "$CONFIG_DIR" ]; then
     FOUND_ITEMS="${FOUND_ITEMS}config "
     echo "  Config: $CONFIG_DIR (will prompt)"
+
+    # Try to read DB_PATH from config
+    if [ -f "$CONFIG_DIR/.env" ]; then
+        DB_PATH=$(grep "^DB_PATH=" "$CONFIG_DIR/.env" 2>/dev/null | cut -d'=' -f2)
+        if [ -n "$DB_PATH" ]; then
+            # Expand ~ if present
+            DB_PATH=$(eval echo "$DB_PATH")
+            if [ -f "$DB_PATH" ]; then
+                echo "  Database: $DB_PATH (will prompt)"
+                FOUND_ITEMS="${FOUND_ITEMS}database "
+            fi
+        fi
+    fi
 fi
 
 if [ -z "$FOUND_ITEMS" ]; then
@@ -119,7 +132,6 @@ fi
 if [ -d "$CONFIG_DIR" ]; then
     echo ""
     echo -e "${YELLOW}Configuration directory exists: $CONFIG_DIR${NC}"
-    echo "WARNING: This contains your database password!"
     read -p "Remove configuration? (y/N): " REMOVE_CONFIG
     if [[ $REMOVE_CONFIG =~ ^[Yy]$ ]]; then
         rm -rf "$CONFIG_DIR"
@@ -129,19 +141,25 @@ if [ -d "$CONFIG_DIR" ]; then
     fi
 fi
 
-# Ask about database data
-echo ""
-echo -e "${YELLOW}Do you want to remove the database tables and data?${NC}"
-echo "WARNING: This will delete all transaction data!"
-read -p "Remove database tables? (y/N): " REMOVE_DB
+# Ask about database
+if [ -n "$DB_PATH" ] && [ -f "$DB_PATH" ]; then
+    echo ""
+    echo -e "${YELLOW}SQLite database file exists: $DB_PATH${NC}"
+    echo "WARNING: This contains all your transaction data!"
+    read -p "Remove database file? (y/N): " REMOVE_DB
+    if [[ $REMOVE_DB =~ ^[Yy]$ ]]; then
+        rm -f "$DB_PATH"
+        echo "  Removed: $DB_PATH"
 
-if [[ $REMOVE_DB =~ ^[Yy]$ ]]; then
-    echo ""
-    echo "To remove database tables, run:"
-    echo "  PGPASSWORD='your_password' psql -h host -p port -U user -d financial_data -c 'DROP TABLE IF EXISTS transactions CASCADE; DROP TABLE IF EXISTS processing_log CASCADE;'"
-    echo ""
-    echo "Or to drop the entire database:"
-    echo "  PGPASSWORD='your_password' psql -h host -p port -U user -c 'DROP DATABASE IF EXISTS financial_data;'"
+        # Remove parent directory if empty
+        DB_DIR=$(dirname "$DB_PATH")
+        if [ -d "$DB_DIR" ] && [ -z "$(ls -A "$DB_DIR")" ]; then
+            rmdir "$DB_DIR" 2>/dev/null || true
+            echo "  Removed empty directory: $DB_DIR"
+        fi
+    else
+        echo "  Kept: $DB_PATH"
+    fi
 fi
 
 echo ""

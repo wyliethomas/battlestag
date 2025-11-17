@@ -24,17 +24,17 @@ type QueryResult struct {
 
 // TransactionJSON represents a transaction in JSON format
 type TransactionJSON struct {
-	ID              int64   `json:"id"`
-	AccountName     string  `json:"account_name"`
-	AccountLast4    string  `json:"account_last4"`
-	TransactionDate string  `json:"transaction_date"`
-	PostDate        *string `json:"post_date,omitempty"`
-	Description     string  `json:"description"`
-	Amount          float64 `json:"amount"`
-	TransactionType string  `json:"transaction_type"`
+	ID              int64    `json:"id"`
+	AccountName     string   `json:"account_name"`
+	AccountLast4    string   `json:"account_last4"`
+	TransactionDate string   `json:"transaction_date"`
+	PostDate        *string  `json:"post_date,omitempty"`
+	Description     string   `json:"description"`
+	Amount          float64  `json:"amount"`
+	TransactionType string   `json:"transaction_type"`
 	Balance         *float64 `json:"balance,omitempty"`
-	StatementDate   string  `json:"statement_date"`
-	SourceFile      string  `json:"source_file"`
+	StatementDate   string   `json:"statement_date"`
+	SourceFile      string   `json:"source_file"`
 }
 
 func main() {
@@ -44,23 +44,20 @@ func main() {
 	// Parse command-line arguments
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS]\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "Query financial transactions from PostgreSQL database.\n\n")
+		fmt.Fprintf(os.Stderr, "Query financial transactions from SQLite database.\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nEnvironment Variables:\n")
-		fmt.Fprintf(os.Stderr, "  DB_HOST      PostgreSQL host (default: localhost)\n")
-		fmt.Fprintf(os.Stderr, "  DB_PORT      PostgreSQL port (default: 5432)\n")
-		fmt.Fprintf(os.Stderr, "  DB_USER      PostgreSQL user (default: postgres)\n")
-		fmt.Fprintf(os.Stderr, "  DB_PASSWORD  PostgreSQL password (required)\n")
-		fmt.Fprintf(os.Stderr, "  DB_NAME      Database name (default: financial_data)\n")
-		fmt.Fprintf(os.Stderr, "  DB_SSLMODE   SSL mode (default: disable)\n\n")
+		fmt.Fprintf(os.Stderr, "  DB_PATH      SQLite database file path (default: ./transactions.db)\n\n")
 		fmt.Fprintf(os.Stderr, "Examples:\n")
 		fmt.Fprintf(os.Stderr, "  # Query all transactions in October 2024\n")
 		fmt.Fprintf(os.Stderr, "  %s --start-date 2024-10-01 --end-date 2024-10-31\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  # Query specific account\n")
 		fmt.Fprintf(os.Stderr, "  %s --start-date 2024-10-01 --end-date 2024-10-31 --account 1234\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  # Query with pretty-printed JSON\n")
-		fmt.Fprintf(os.Stderr, "  %s --start-date 2024-10-01 --end-date 2024-10-31 --pretty\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s --start-date 2024-10-01 --end-date 2024-10-31 --pretty\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  # Show account summary\n")
+		fmt.Fprintf(os.Stderr, "  %s --summary --pretty\n", os.Args[0])
 	}
 
 	startDateStr := flag.String("start-date", "", "Start date (YYYY-MM-DD) - required")
@@ -84,9 +81,9 @@ func main() {
 	}
 
 	// Connect to database
-	database, err := db.New(cfg.ConnectionString())
+	database, err := db.New(cfg.DatabasePath())
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Fatalf("Failed to open database: %v", err)
 	}
 	defer database.Close()
 

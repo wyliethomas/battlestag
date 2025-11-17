@@ -31,50 +31,19 @@ read -p "Config directory [~/.config/financial-processor]: " CONFIG_DIR
 CONFIG_DIR=${CONFIG_DIR:-~/.config/financial-processor}
 CONFIG_DIR=$(eval echo "$CONFIG_DIR")  # Expand ~
 
-# Prompt for database configuration
+# Prompt for database file location
 echo ""
-echo -e "${YELLOW}PostgreSQL Database Configuration:${NC}"
-read -p "DB Host [localhost]: " DB_HOST
-DB_HOST=${DB_HOST:-localhost}
-
-read -p "DB Port [5432]: " DB_PORT
-DB_PORT=${DB_PORT:-5432}
-
-read -p "DB User [postgres]: " DB_USER
-DB_USER=${DB_USER:-postgres}
-
-read -sp "DB Password (required): " DB_PASSWORD
-echo ""
-
-read -p "DB Name [financial_data]: " DB_NAME
-DB_NAME=${DB_NAME:-financial_data}
-
-read -p "DB SSL Mode [disable]: " DB_SSLMODE
-DB_SSLMODE=${DB_SSLMODE:-disable}
-
-if [ -z "$DB_PASSWORD" ]; then
-    echo -e "${RED}Error: Database password is required${NC}"
-    exit 1
-fi
-
-# Ask about database setup
-echo ""
-echo -e "${YELLOW}Do you want to run the database schema setup now?${NC}"
-echo "This will create tables, indexes, and views in the $DB_NAME database."
-read -p "Run schema setup? (y/N): " RUN_SCHEMA
-RUN_SCHEMA=${RUN_SCHEMA:-n}
+echo -e "${YELLOW}Where should the SQLite database be stored?${NC}"
+read -p "Database path [~/.local/share/financial-processor/transactions.db]: " DB_PATH
+DB_PATH=${DB_PATH:-~/.local/share/financial-processor/transactions.db}
+DB_PATH=$(eval echo "$DB_PATH")  # Expand ~
 
 echo ""
 echo -e "${GREEN}Summary:${NC}"
 echo "  Processor Binary: $INSTALL_DIR/financial-statement-processor"
 echo "  Query Binary: $INSTALL_DIR/financial-statement-query"
 echo "  Config: $CONFIG_DIR/.env"
-echo "  Database: $DB_HOST:$DB_PORT/$DB_NAME"
-if [[ $RUN_SCHEMA =~ ^[Yy]$ ]]; then
-    echo "  Schema: Will be installed"
-else
-    echo "  Schema: Skip (manual setup required)"
-fi
+echo "  Database: $DB_PATH"
 echo ""
 read -p "Proceed with installation? (y/N): " CONFIRM
 
@@ -96,6 +65,11 @@ go build -o financial-statement-query ./cmd/query
 echo -e "${GREEN}Creating config directory...${NC}"
 mkdir -p "$CONFIG_DIR"
 
+# Create database directory
+DB_DIR=$(dirname "$DB_PATH")
+echo -e "${GREEN}Creating database directory...${NC}"
+mkdir -p "$DB_DIR"
+
 echo -e "${GREEN}Installing binaries...${NC}"
 if [ "$INSTALL_DIR" = "/usr/local/bin" ] || [ "$INSTALL_DIR" = "/usr/bin" ]; then
     sudo cp financial-statement-processor "$INSTALL_DIR/"
@@ -114,13 +88,8 @@ cat > "$CONFIG_DIR/.env" <<EOF
 # Financial Statement Processor Configuration
 # Generated on $(date)
 
-# PostgreSQL Database Configuration
-DB_HOST=$DB_HOST
-DB_PORT=$DB_PORT
-DB_USER=$DB_USER
-DB_PASSWORD=$DB_PASSWORD
-DB_NAME=$DB_NAME
-DB_SSLMODE=$DB_SSLMODE
+# SQLite Database File Path
+DB_PATH=$DB_PATH
 EOF
 
 chmod 600 "$CONFIG_DIR/.env"
@@ -160,20 +129,6 @@ else
     chmod +x "$WRAPPER_QUERY"
 fi
 
-# Run schema setup if requested
-if [[ $RUN_SCHEMA =~ ^[Yy]$ ]]; then
-    echo ""
-    echo -e "${GREEN}Setting up database schema...${NC}"
-    PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f schema.sql
-
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}Database schema installed successfully!${NC}"
-    else
-        echo -e "${YELLOW}WARNING: Schema installation failed. You may need to run it manually:${NC}"
-        echo "  PGPASSWORD='***' psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f schema.sql"
-    fi
-fi
-
 echo ""
 echo -e "${GREEN}====================================================${NC}"
 echo -e "${GREEN}  Installation Complete!${NC}"
@@ -181,8 +136,9 @@ echo -e "${GREEN}====================================================${NC}"
 echo ""
 echo "Next steps:"
 echo ""
-echo "1. Test database connection:"
+echo "1. Test database initialization:"
 echo "   ${YELLOW}$WRAPPER_QUERY --summary${NC}"
+echo "   (This will create the database and tables automatically)"
 echo ""
 echo "2. Process a statement file:"
 echo "   ${YELLOW}$WRAPPER_PROCESSOR /path/to/statement.pdf${NC}"
@@ -194,9 +150,8 @@ echo "4. Update watches.json in financial-document-watcher to use:"
 echo "   ${YELLOW}\"executable_path\": \"$WRAPPER_PROCESSOR\"${NC}"
 echo ""
 echo "Configuration stored in: $CONFIG_DIR/.env"
+echo "Database will be created at: $DB_PATH"
 echo ""
-if [[ ! $RUN_SCHEMA =~ ^[Yy]$ ]]; then
-    echo -e "${YELLOW}NOTE: Database schema not installed. Run manually:${NC}"
-    echo "  PGPASSWORD='$DB_PASSWORD' psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f schema.sql"
-    echo ""
-fi
+echo -e "${GREEN}NOTE: Database tables are created automatically on first use.${NC}"
+echo "      No manual schema setup required!"
+echo ""

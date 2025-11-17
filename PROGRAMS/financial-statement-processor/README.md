@@ -1,16 +1,17 @@
 # Financial Statement Processor
 
-A Go-based system for parsing bank statements (PDF and images) and storing transactions in PostgreSQL. Designed to work with the financial-document-watcher for automated statement processing.
+A Go-based system for parsing bank statements (PDF and images) and storing transactions in SQLite. Designed to work with the financial-document-watcher for automated statement processing.
 
 ## Features
 
 - **Dual executables**: Processor for parsing statements, query tool for retrieving data
 - **Multi-format support**: PDF and image files (via OCR)
-- **PostgreSQL storage**: Robust relational database with proper indexing
+- **SQLite storage**: Single-file database, no server setup required
 - **Duplicate prevention**: Automatic detection and skipping of duplicate transactions
 - **Proper exit codes**: Integration-friendly (0=success, 1=parse error, 2=db error)
 - **JSON output**: Query results in structured JSON format
 - **Comprehensive logging**: All operations logged to stdout for monitoring
+- **Portable**: Each installation has its own isolated database file
 
 ## Components
 
@@ -45,8 +46,7 @@ Query and retrieve transaction data in JSON format.
 ### Prerequisites
 
 - Go 1.16 or higher
-- PostgreSQL 12 or higher
-- psql command-line tool (for schema setup)
+- SQLite3 (usually pre-installed on Linux/macOS)
 
 ### Quick Installation
 
@@ -57,18 +57,19 @@ cd financial-statement-processor
 
 The installer will:
 1. Prompt for installation paths
-2. Collect database credentials
+2. Prompt for database file location
 3. Build both executables
 4. Install binaries to `/usr/local/bin`
-5. Create configuration file with database settings
-6. Optionally run database schema setup
-7. Create wrapper scripts with environment variables
+5. Create configuration file
+6. Create wrapper scripts with environment variables
+7. Create database directory
+
+**Database tables are created automatically** on first use - no manual setup required!
 
 ### Manual Installation
 
 1. Initialize Go module:
 ```bash
-go mod init financial-statement-processor
 go mod tidy
 ```
 
@@ -78,16 +79,10 @@ go build -o financial-statement-processor ./cmd/processor
 go build -o financial-statement-query ./cmd/query
 ```
 
-3. Set up database:
-```bash
-createdb financial_data
-psql -d financial_data -f schema.sql
-```
-
-4. Configure environment:
+3. Configure environment:
 ```bash
 cp .env.example .env
-# Edit .env with your database credentials
+# Edit .env with your database path
 ```
 
 ## Configuration
@@ -96,20 +91,20 @@ cp .env.example .env
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DB_HOST` | `localhost` | PostgreSQL server host |
-| `DB_PORT` | `5432` | PostgreSQL server port |
-| `DB_USER` | `postgres` | Database user |
-| `DB_PASSWORD` | *(required)* | Database password |
-| `DB_NAME` | `financial_data` | Database name |
-| `DB_SSLMODE` | `disable` | SSL mode (disable, require, verify-full) |
+| `DB_PATH` | `./transactions.db` | SQLite database file path |
+
+The `DB_PATH` can be:
+- Relative path: `./transactions.db`
+- Absolute path: `/home/user/data/transactions.db`
+- Home directory: `~/.local/share/financial-processor/transactions.db`
 
 ### Database Schema
 
-The schema includes:
+The schema is automatically created on first use and includes:
 - **transactions** table: Stores all transaction records
 - **processing_log** table: Tracks statement processing history
-- **account_summary** view: Quick account statistics
-- **monthly_summary** view: Monthly aggregates by account
+- Indexes for performance on common queries
+- Trigger to auto-update timestamps
 
 See `schema.sql` for complete schema definition.
 
@@ -126,7 +121,7 @@ financial-statement-processor-run /path/to/statement.pdf
 With custom database:
 
 ```bash
-DB_HOST=192.168.1.100 DB_PASSWORD=secret financial-statement-processor /path/to/statement.pdf
+DB_PATH=/path/to/custom.db financial-statement-processor /path/to/statement.pdf
 ```
 
 Verbose output:
@@ -232,16 +227,12 @@ func parsePDF(filePath string) (*StatementData, error) {
     }
     defer f.Close()
 
-    // Get file info for size
     fileInfo, _ := f.Stat()
-
-    // Read PDF
     pdfReader, err := pdf.NewReader(f, fileInfo.Size())
     if err != nil {
         return nil, err
     }
 
-    // Extract text from all pages
     var fullText strings.Builder
     for pageNum := 1; pageNum <= pdfReader.NumPage(); pageNum++ {
         page := pdfReader.Page(pageNum)
@@ -249,7 +240,6 @@ func parsePDF(filePath string) (*StatementData, error) {
         fullText.WriteString(text)
     }
 
-    // Parse the text
     return parseStatementText(fullText.String(), filePath)
 }
 ```
@@ -296,7 +286,6 @@ func parseStatementText(text, sourceFile string) (*StatementData, error) {
     dateMatch := datePattern.FindStringSubmatch(text)
 
     // Extract transactions
-    // Pattern: DATE DESCRIPTION AMOUNT BALANCE
     txPattern := regexp.MustCompile(`(\d{1,2}/\d{1,2})\s+(.+?)\s+([\-\$\d,\.]+)\s+([\$\d,\.]+)`)
     txMatches := txPattern.FindAllStringSubmatch(text, -1)
 
@@ -308,48 +297,58 @@ func parseStatementText(text, sourceFile string) (*StatementData, error) {
 
 ### View Processing Log
 
-```sql
-SELECT * FROM processing_log ORDER BY processed_at DESC LIMIT 10;
+```bash
+sqlite3 ~/.local/share/financial-processor/transactions.db "SELECT * FROM processing_log ORDER BY processed_at DESC LIMIT 10;"
 ```
 
 ### Find Duplicates
 
-```sql
+```bash
+sqlite3 ~/.local/share/financial-processor/transactions.db "
 SELECT account_last4, transaction_date, description, amount, COUNT(*)
 FROM transactions
 GROUP BY account_last4, transaction_date, description, amount
 HAVING COUNT(*) > 1;
+"
 ```
 
 ### Account Summary
 
-```sql
-SELECT * FROM account_summary;
-```
-
-### Monthly Totals
-
-```sql
-SELECT * FROM monthly_summary WHERE month >= '2024-01-01';
+```bash
+sqlite3 ~/.local/share/financial-processor/transactions.db "
+SELECT account_name, account_last4, COUNT(*) as transaction_count,
+       SUM(CASE WHEN transaction_type = 'debit' THEN amount ELSE 0 END) as total_debits,
+       SUM(CASE WHEN transaction_type = 'credit' THEN amount ELSE 0 END) as total_credits
+FROM transactions
+GROUP BY account_name, account_last4;
+"
 ```
 
 ### Delete Test Data
 
-```sql
+```bash
+sqlite3 ~/.local/share/financial-processor/transactions.db "
 DELETE FROM transactions WHERE source_file LIKE 'test%';
 DELETE FROM processing_log WHERE source_file LIKE 'test%';
+"
+```
+
+### Backup Database
+
+```bash
+cp ~/.local/share/financial-processor/transactions.db ~/.local/share/financial-processor/transactions_backup_$(date +%Y%m%d).db
 ```
 
 ## Troubleshooting
 
-### "DB_PASSWORD environment variable is required"
-- Ensure DB_PASSWORD is set in your .env file
-- Or use the wrapper scripts which load .env automatically
+### "Configuration error"
+- Ensure DB_PATH is set (or use wrapper scripts which load .env automatically)
+- Check directory permissions for database path
 
-### "Failed to connect to database"
-- Check PostgreSQL is running: `systemctl status postgresql`
-- Verify database exists: `psql -l | grep financial_data`
-- Test connection: `psql -h localhost -U postgres -d financial_data`
+### "Failed to open database"
+- Check parent directory exists and is writable
+- Verify database file isn't locked by another process
+- Check disk space
 
 ### "PDF parsing not yet implemented"
 - Add PDF parsing library (see Implementing Parser Logic)
@@ -367,9 +366,9 @@ DELETE FROM processing_log WHERE source_file LIKE 'test%';
 - Check logs for specific error message
 
 ### Exit code 2 (database error)
-- Database connection failed
-- Transaction insertion failed
-- Check PostgreSQL logs: `/var/log/postgresql/`
+- Database file locked
+- Disk full
+- Permission denied
 
 ## Project Structure
 
@@ -381,12 +380,12 @@ financial-statement-processor/
 │   └── query/
 │       └── main.go              # Query executable
 ├── db/
-│   └── postgres.go              # Database operations
+│   └── sqlite.go                # Database operations
 ├── parser/
 │   └── parser.go                # PDF/OCR parsing logic
 ├── config/
 │   └── config.go                # Configuration management
-├── schema.sql                   # Database schema
+├── schema.sql                   # SQLite database schema
 ├── .env.example                 # Example environment file
 ├── install.sh                   # Installation script
 ├── uninstall.sh                 # Uninstallation script
@@ -397,18 +396,17 @@ financial-statement-processor/
 
 ## Security Considerations
 
-- **Password storage**: .env file contains database password (chmod 600)
+- **Database file**: Keep database file readable only by your user (chmod 600)
 - **SQL injection**: All queries use parameterized statements
 - **File validation**: Validates file existence and type before processing
-- **Connection pooling**: Limits max database connections
-- **SSL mode**: Configure DB_SSLMODE for production environments
+- **Isolation**: Each installation uses its own database file
 
 ## Development
 
 ### Add Dependencies
 
 ```bash
-go get github.com/lib/pq
+go get github.com/mattn/go-sqlite3
 go get github.com/joho/godotenv
 # Add your PDF/OCR libraries here
 go mod tidy
@@ -421,7 +419,7 @@ go mod tidy
 ./financial-statement-processor-run ./test_statements/sample.pdf
 
 # Check database
-psql -d financial_data -c "SELECT COUNT(*) FROM transactions;"
+sqlite3 ~/.local/share/financial-processor/transactions.db "SELECT COUNT(*) FROM transactions;"
 
 # Query results
 ./financial-statement-query-run --start-date 2024-01-01 --end-date 2024-12-31 --pretty
@@ -436,6 +434,14 @@ The parser currently needs customization for your specific bank. Common formats:
 - **Images**: JPG, PNG, TIFF (require OCR)
 
 **Note:** Each bank has different statement formats. You'll need to adjust regex patterns and parsing logic for your specific bank's layout.
+
+## Why SQLite?
+
+- **Zero configuration**: No database server to set up or manage
+- **Single file**: Easy to backup, move, and share
+- **Portable**: Each program instance completely isolated
+- **Perfect for single-user**: No concurrent access issues
+- **Lightweight**: Minimal dependencies and resource usage
 
 ## License
 

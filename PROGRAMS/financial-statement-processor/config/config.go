@@ -3,54 +3,48 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 // Config holds the database configuration
 type Config struct {
-	DBHost     string
-	DBPort     string
-	DBUser     string
-	DBPassword string
-	DBName     string
-	DBSSLMode  string
+	DBPath string
 }
+
+const defaultDBPath = "./transactions.db"
 
 // LoadFromEnv loads configuration from environment variables
 func LoadFromEnv() (*Config, error) {
-	cfg := &Config{
-		DBHost:     getEnv("DB_HOST", "localhost"),
-		DBPort:     getEnv("DB_PORT", "5432"),
-		DBUser:     getEnv("DB_USER", "postgres"),
-		DBPassword: os.Getenv("DB_PASSWORD"), // Required, no default
-		DBName:     getEnv("DB_NAME", "financial_data"),
-		DBSSLMode:  getEnv("DB_SSLMODE", "disable"),
+	dbPath := os.Getenv("DB_PATH")
+
+	// If not set, use default
+	if dbPath == "" {
+		dbPath = defaultDBPath
 	}
 
-	// Validate required fields
-	if cfg.DBPassword == "" {
-		return nil, fmt.Errorf("DB_PASSWORD environment variable is required")
+	// Expand ~ to home directory if present
+	if len(dbPath) > 0 && dbPath[0] == '~' {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("get home directory: %w", err)
+		}
+		dbPath = filepath.Join(home, dbPath[1:])
+	}
+
+	// Ensure directory exists
+	dbDir := filepath.Dir(dbPath)
+	if err := os.MkdirAll(dbDir, 0755); err != nil {
+		return nil, fmt.Errorf("create database directory: %w", err)
+	}
+
+	cfg := &Config{
+		DBPath: dbPath,
 	}
 
 	return cfg, nil
 }
 
-// ConnectionString returns the PostgreSQL connection string
-func (c *Config) ConnectionString() string {
-	return fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		c.DBHost,
-		c.DBPort,
-		c.DBUser,
-		c.DBPassword,
-		c.DBName,
-		c.DBSSLMode,
-	)
-}
-
-// getEnv retrieves an environment variable or returns a default value
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
+// DatabasePath returns the database file path
+func (c *Config) DatabasePath() string {
+	return c.DBPath
 }

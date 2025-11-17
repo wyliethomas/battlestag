@@ -28,18 +28,13 @@ func main() {
 	// Parse command-line arguments
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS] <file_path>\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "Process a bank statement PDF or image file and store transactions in PostgreSQL.\n\n")
+		fmt.Fprintf(os.Stderr, "Process a bank statement PDF or image file and store transactions in SQLite.\n\n")
 		fmt.Fprintf(os.Stderr, "Arguments:\n")
 		fmt.Fprintf(os.Stderr, "  file_path    Path to the statement file (PDF, JPG, PNG, TIFF)\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nEnvironment Variables:\n")
-		fmt.Fprintf(os.Stderr, "  DB_HOST      PostgreSQL host (default: localhost)\n")
-		fmt.Fprintf(os.Stderr, "  DB_PORT      PostgreSQL port (default: 5432)\n")
-		fmt.Fprintf(os.Stderr, "  DB_USER      PostgreSQL user (default: postgres)\n")
-		fmt.Fprintf(os.Stderr, "  DB_PASSWORD  PostgreSQL password (required)\n")
-		fmt.Fprintf(os.Stderr, "  DB_NAME      Database name (default: financial_data)\n")
-		fmt.Fprintf(os.Stderr, "  DB_SSLMODE   SSL mode (default: disable)\n\n")
+		fmt.Fprintf(os.Stderr, "  DB_PATH      SQLite database file path (default: ./transactions.db)\n\n")
 		fmt.Fprintf(os.Stderr, "Exit Codes:\n")
 		fmt.Fprintf(os.Stderr, "  0 - Success\n")
 		fmt.Fprintf(os.Stderr, "  1 - Parse error\n")
@@ -82,14 +77,14 @@ func main() {
 	}
 
 	// Connect to database
-	log.Printf("Connecting to database...")
-	database, err := db.New(cfg.ConnectionString())
+	log.Printf("Opening database: %s", cfg.DatabasePath())
+	database, err := db.New(cfg.DatabasePath())
 	if err != nil {
-		log.Printf("ERROR: Failed to connect to database: %v", err)
+		log.Printf("ERROR: Failed to open database: %v", err)
 		os.Exit(ExitDBError)
 	}
 	defer database.Close()
-	log.Printf("Database connected successfully")
+	log.Printf("Database opened successfully")
 
 	// Parse the statement file
 	log.Printf("Parsing statement file...")
@@ -140,13 +135,13 @@ func main() {
 
 		// Log database error
 		logErr := database.LogProcessing(&db.ProcessingLog{
-			SourceFile:          filepath.Base(filePath),
-			StatementDate:       &statementData.StatementDate,
-			AccountName:         statementData.AccountName,
+			SourceFile:           filepath.Base(filePath),
+			StatementDate:        &statementData.StatementDate,
+			AccountName:          statementData.AccountName,
 			TransactionsInserted: inserted,
 			TransactionsSkipped:  skipped,
-			Status:              "db_error",
-			ErrorMessage:        err.Error(),
+			Status:               "db_error",
+			ErrorMessage:         err.Error(),
 		})
 		if logErr != nil {
 			log.Printf("WARNING: Failed to log processing error: %v", logErr)
