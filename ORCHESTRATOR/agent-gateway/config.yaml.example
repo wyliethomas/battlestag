@@ -1,0 +1,40 @@
+# Agent Gateway Configuration
+# Copy this file to config.yaml and update with your settings
+
+# Agent configurations
+agents:
+  # Stoic thoughts agent
+  stoic:
+    # Path to the stoic executable (required)
+    executable_path: "/home/battlestag/Work/WYBOT/PROGRAMS/stoic/stoic-thought"
+    # Path to the database (optional, for advanced features like random, latest, all)
+    db_path: "/home/battlestag/Work/WYBOT/PROGRAMS/stoic/stoic_thoughts.db"
+
+  # Tech tips agent
+  tech:
+    # Path to the tech-tip executable (required)
+    executable_path: "/home/battlestag/Work/WYBOT/PROGRAMS/tech-tip/tech-tip"
+    # Path to the database (optional, for advanced features like random, latest, all)
+    db_path: "/home/battlestag/Work/WYBOT/PROGRAMS/tech-tip/tech_tips.db"
+
+# HTTP server configuration
+server:
+  # Port to listen on (can be overridden with PORT env var)
+  port: "8080"
+
+  # Host to bind to (0.0.0.0 allows access from network, can be overridden with HOST env var)
+  host: "0.0.0.0"
+
+# Authentication configuration
+auth:
+  # API key required for accessing endpoints (can be overridden with API_KEY env var)
+  # IMPORTANT: Change this to a secure random string!
+  api_key: "your-secret-api-key-here"
+
+# Logging configuration
+logging:
+  # Access log file path
+  access_log: "logs/access.log"
+
+  # Error log file path
+  error_log: "logs/error.log"

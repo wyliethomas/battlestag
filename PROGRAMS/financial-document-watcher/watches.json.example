@@ -1,0 +1,23 @@
+[
+  {
+    "watch_id": "bank_statements",
+    "watch_path": "/home/user/Documents/financial/incoming/bank",
+    "file_pattern": "*.pdf",
+    "executable_path": "/usr/local/bin/process-bank-statement",
+    "processed_path": "/home/user/Documents/financial/processed/bank"
+  },
+  {
+    "watch_id": "invoices",
+    "watch_path": "/home/user/Documents/financial/incoming/invoices",
+    "file_pattern": "invoice_*.pdf",
+    "executable_path": "/usr/local/bin/process-invoice",
+    "processed_path": "/home/user/Documents/financial/processed/invoices"
+  },
+  {
+    "watch_id": "receipts",
+    "watch_path": "/home/user/Documents/financial/incoming/receipts",
+    "file_pattern": "*.{pdf,jpg,png}",
+    "executable_path": "/usr/local/bin/ocr-and-categorize",
+    "processed_path": "/home/user/Documents/financial/processed/receipts"
+  }
+]

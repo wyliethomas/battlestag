@@ -1,0 +1,29 @@
+# Environment variables
+.env
+
+# Database files
+*.db
+
+# Compiled binaries
+tech-tip
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go workspace file
+go.work
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

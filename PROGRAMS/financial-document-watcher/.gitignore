@@ -1,0 +1,14 @@
+# Binaries
+financial-document-watcher
+
+# Database
+*.db
+
+# Config (keep .example)
+watches.json
+
+# Go
+go.sum
+
+# Logs
+*.log

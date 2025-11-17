@@ -1,0 +1,62 @@
+Financial Statement Watcher
+
+A simple Go executable that checks designated folders for new files and triggers processing executables when files are found. The watcher is scheduled via cron to run daily and reads its configuration from a JSON file that specifies which folders to monitor, what file patterns to match, and which executable to call when files appear. When a matching file is detected, the watcher executes the appropriate processor binary with the file path as an argument, logs the result, and moves the file to a processed folder. This creates a lightweight, serverless architecture where everything is just executables orchestrated by cron, with no HTTP services to maintain or monitor.
+
+------------------------------------------------
+
+
+Financial Statement Processor
+
+A Go executable that parses bank and credit card statements from PDF or image files and stores transaction data in a database. The processor is triggered by the Financial Document Watcher when new statement files are detected in monitored folders. It accepts a file path as a command-line argument, uses OCR for images and PDF parsing libraries for PDFs to extract transaction details (date, description, amount, account info), and inserts each transaction as a database record. The processor returns exit code 0 on success or non-zero on failure, allowing the watcher to determine whether to move the file to the processed folder. A separate query executable provides read access to the transaction database, accepting date ranges and returning JSON organized by account for use by other financial agents like expense categorizers.
+
+
+------------------------------------------------
+
+
+Financial Asset Agent
+
+This agent will be a simple database of what assets I own. It will need to save my vehicles and property. Once a month it will need to do a web search to determine the current value of the asset. And then it will need to track the value of the asset over time. For example, Month one my vehicle could be 14k, then month 2 13k then month 3 14k. This agent will need to provice endpoints so it can share data with other agents about both the current value of the assets and another endpoint to share the historic value of the asset over time.
+
+There should also be endpoints to allow me to CRUD assets.
+
+
+------------------------------------------------
+
+
+Financial Liability Agent
+
+
+This agent will need to track my loans as well as my credit cards. For loans it will need to be able to track the historical principle and interest payments. I will be able to upload a PDF at the begining of each month. This agent will also need to look for a new PDF on the first of each month, then try again on the second and third and so on until I upload a new PDF. It will need to process the PDF and update the data on the loan. 
+
+It will need to do the same for credit cards. I will upload credit card statements at the begining of the month. When the agent gets new data it will need to store each transaction.
+
+This agent will also need to expose endpoints that will let other agents query a date range for new data so they can analyze the data.
+
+
+------------------------------------------------
+
+
+Financial Retirement Agent
+
+Once a day this agent will look for a new PDF for me to upload of a statement from my retirement accounts. The timing is sporatic and I get statements through the month. So this agent will just need to look once a day to see if there is anything new to process.
+
+When it finds a new file to process, it will need to be able to read the PDF and update the database with the data for that account. 
+
+It will also need to be able to expose an endpoint for another agent to query for the current data/value of all accounts. As well as historical data endpoints.
+
+
+------------------------------------------------
+
+
+Financial Analyst Agent
+
+Once a month, this agent will query the Financial Account Agent, Financial Asset Agent, Financial Retirement Agent and Financial Liability Agent for the latest data. It too will need to know to query once a day until it has new data. Once it has new data, this agent will need to categorize each transaction into categories.
+
+Once a week (day of week should be configurable), this agent will analyze the category data and generate a simple balance sheet. Then the agent will send the balance sheet to the LLM for an analysis. The agent will ask the LLM for input on the balance sheet. The agent will store the analysis in the DB. 
+
+This agent will also be able to send historical data to the LLM for projects on cash flow, debt payoff, etc.
+
+We will need an endpoint for other agents to access the analysis.
+
+
+

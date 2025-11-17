@@ -1,0 +1,27 @@
+[Unit]
+Description=Agent Gateway API Server
+After=network.target
+Documentation=https://github.com/battlestag/agent-gateway
+
+[Service]
+Type=simple
+User=battlestag
+Group=battlestag
+WorkingDirectory=/home/battlestag/Work/WYBOT/ORCHESTRATOR/agent-gateway
+ExecStart=/home/battlestag/Work/WYBOT/ORCHESTRATOR/agent-gateway/agent-gateway --config /home/battlestag/Work/WYBOT/ORCHESTRATOR/agent-gateway/config.yaml
+
+# Restart policy
+Restart=always
+RestartSec=5
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=agent-gateway
+
+[Install]
+WantedBy=multi-user.target

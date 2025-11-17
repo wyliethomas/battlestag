@@ -1,0 +1,24 @@
+[Unit]
+Description=Daily Stoic Thought Generator
+After=network.target
+
+[Service]
+Type=oneshot
+# Binary location (installed by deployment script)
+ExecStart=/usr/local/bin/stoic-thought
+
+# Configuration via environment variables
+Environment="OLLAMA_HOST=http://localhost:11434"
+Environment="OLLAMA_MODEL=dolphin3"
+Environment="DB_PATH=/var/lib/stoic-thought/thoughts.db"
+
+# Note: User systemd service runs as the user who enabled it
+# No need to specify User/Group for user services
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=stoic-thought
+
+[Install]
+WantedBy=default.target
