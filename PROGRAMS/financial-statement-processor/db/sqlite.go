@@ -355,6 +355,69 @@ func (db *DB) QueryTransactions(startDate, endDate time.Time, accountFilter stri
 	return transactions, nil
 }
 
+// QueryTransactionsWithType queries transactions with optional transaction type filter
+func (db *DB) QueryTransactionsWithType(startDate, endDate time.Time, accountFilter, transactionType string) ([]*Transaction, error) {
+	query := `
+		SELECT
+			id, account_name, account_last4, transaction_date, post_date,
+			description, amount, transaction_type, balance,
+			statement_date, source_file, created_at, updated_at
+		FROM transactions
+		WHERE transaction_date >= ? AND transaction_date <= ?
+	`
+
+	args := []interface{}{startDate, endDate}
+
+	if accountFilter != "" {
+		query += " AND (account_name LIKE ? OR account_last4 = ?)"
+		likeFilter := "%" + accountFilter + "%"
+		args = append(args, likeFilter, accountFilter)
+	}
+
+	if transactionType != "all" {
+		query += " AND transaction_type = ?"
+		args = append(args, transactionType)
+	}
+
+	query += " ORDER BY transaction_date DESC, id DESC"
+
+	rows, err := db.conn.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query transactions: %w", err)
+	}
+	defer rows.Close()
+
+	var transactions []*Transaction
+	for rows.Next() {
+		tx := &Transaction{}
+		err := rows.Scan(
+			&tx.ID,
+			&tx.AccountName,
+			&tx.AccountLast4,
+			&tx.TransactionDate,
+			&tx.PostDate,
+			&tx.Description,
+			&tx.Amount,
+			&tx.TransactionType,
+			&tx.Balance,
+			&tx.StatementDate,
+			&tx.SourceFile,
+			&tx.CreatedAt,
+			&tx.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan transaction: %w", err)
+		}
+		transactions = append(transactions, tx)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate transactions: %w", err)
+	}
+
+	return transactions, nil
+}
+
 // GetAccountSummary retrieves account summary information
 func (db *DB) GetAccountSummary() ([]map[string]interface{}, error) {
 	query := `
