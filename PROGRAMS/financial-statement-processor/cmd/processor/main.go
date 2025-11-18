@@ -7,24 +7,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"financial-statement-processor/config"
 	"financial-statement-processor/db"
 	"financial-statement-processor/parser"
-
-	"github.com/joho/godotenv"
-)
-
-const (
-	ExitSuccess     = 0
-	ExitParseError  = 1
-	ExitDBError     = 2
-	ExitConfigError = 3
+	"financial-statement-processor/pkg/app"
+	"financial-statement-processor/pkg/exitcodes"
 )
 
 func main() {
-	// Load .env file if it exists (silently ignore if it doesn't)
-	_ = godotenv.Load()
-
 	// Parse command-line arguments
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS] <file_path>\n\n", os.Args[0])
@@ -52,7 +41,7 @@ func main() {
 	if flag.NArg() < 1 {
 		fmt.Fprintf(os.Stderr, "Error: file path is required\n\n")
 		flag.Usage()
-		os.Exit(ExitConfigError)
+		os.Exit(exitcodes.ConfigError)
 	}
 
 	filePath := flag.Arg(0)
@@ -68,14 +57,14 @@ func main() {
 	// Validate file exists
 	if !parser.FileExists(filePath) {
 		log.Printf("ERROR: File not found: %s", filePath)
-		os.Exit(ExitParseError)
+		os.Exit(exitcodes.ParseError)
 	}
 
-	// Load database configuration
-	cfg, err := config.LoadFromEnv()
+	// Load configuration
+	cfg, err := app.InitConfig()
 	if err != nil {
 		log.Printf("ERROR: Configuration error: %v", err)
-		os.Exit(ExitConfigError)
+		os.Exit(exitcodes.ConfigError)
 	}
 
 	// Connect to database
@@ -83,7 +72,7 @@ func main() {
 	database, err := db.New(cfg.DatabasePath())
 	if err != nil {
 		log.Printf("ERROR: Failed to open database: %v", err)
-		os.Exit(ExitDBError)
+		os.Exit(exitcodes.DBError)
 	}
 	defer database.Close()
 	log.Printf("Database opened successfully")
@@ -105,7 +94,7 @@ func main() {
 			log.Printf("WARNING: Failed to log processing error: %v", logErr)
 		}
 
-		os.Exit(ExitParseError)
+		os.Exit(exitcodes.ParseError)
 	}
 
 	// Validate parsed data
@@ -122,7 +111,7 @@ func main() {
 			log.Printf("WARNING: Failed to log processing error: %v", logErr)
 		}
 
-		os.Exit(ExitParseError)
+		os.Exit(exitcodes.ParseError)
 	}
 
 	log.Printf("Parsed statement successfully:")
@@ -150,7 +139,7 @@ func main() {
 			log.Printf("WARNING: Failed to log processing error: %v", logErr)
 		}
 
-		os.Exit(ExitDBError)
+		os.Exit(exitcodes.DBError)
 	}
 
 	log.Printf("Transactions inserted: %d", inserted)
@@ -170,5 +159,5 @@ func main() {
 	}
 
 	log.Printf("Processing completed successfully")
-	os.Exit(ExitSuccess)
+	os.Exit(exitcodes.Success)
 }

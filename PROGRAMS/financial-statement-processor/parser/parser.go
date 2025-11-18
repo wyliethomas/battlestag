@@ -70,55 +70,6 @@ func parsePDF(filePath, ollamaHost, ollamaModel string) (*StatementData, error) 
 	return parseMultiPageWithLLM(pages, filePath, ollamaHost, ollamaModel)
 }
 
-// extractPDFText extracts all text content from a PDF file
-func extractPDFText(filePath string) (string, error) {
-	f, err := os.Open(filePath)
-	if err != nil {
-		return "", fmt.Errorf("open PDF: %w", err)
-	}
-	defer f.Close()
-
-	fileInfo, err := f.Stat()
-	if err != nil {
-		return "", fmt.Errorf("stat PDF: %w", err)
-	}
-
-	pdfReader, err := pdf.NewReader(f, fileInfo.Size())
-	if err != nil {
-		return "", fmt.Errorf("create PDF reader: %w", err)
-	}
-
-	var fullText strings.Builder
-	numPages := pdfReader.NumPage()
-	log.Printf("PDF has %d pages", numPages)
-
-	pagesProcessed := 0
-	for pageNum := 1; pageNum <= numPages; pageNum++ {
-		page := pdfReader.Page(pageNum)
-		if page.V.IsNull() {
-			log.Printf("WARNING: Page %d is null, skipping", pageNum)
-			continue
-		}
-
-		text, err := page.GetPlainText(nil)
-		if err != nil {
-			// Continue with other pages if one fails
-			log.Printf("WARNING: Failed to extract text from page %d: %v", pageNum, err)
-			continue
-		}
-
-		fullText.WriteString(text)
-		fullText.WriteString("\n")
-		pagesProcessed++
-	}
-
-	extractedText := fullText.String()
-	log.Printf("Successfully extracted text from %d/%d pages (%d characters total)",
-		pagesProcessed, numPages, len(extractedText))
-
-	return extractedText, nil
-}
-
 // extractPDFTextByPage extracts text from each page of a PDF separately
 func extractPDFTextByPage(filePath string) ([]string, error) {
 	f, err := os.Open(filePath)

@@ -5,20 +5,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
-	"financial-statement-processor/config"
 	"financial-statement-processor/db"
-
-	"github.com/joho/godotenv"
-)
-
-const (
-	ExitSuccess   = 0
-	ExitArgsError = 1
-	ExitDBError   = 2
+	"financial-statement-processor/pkg/app"
+	"financial-statement-processor/pkg/exitcodes"
 )
 
 // QueryResult represents the output structure
@@ -45,9 +37,6 @@ type TransactionJSON struct {
 }
 
 func main() {
-	// Load .env file if it exists (silently ignore if it doesn't)
-	_ = godotenv.Load()
-
 	// Parse command-line arguments
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS]\n\n", os.Args[0])
@@ -86,28 +75,21 @@ func main() {
 	if !*summary && (*startDateStr == "" || *endDateStr == "") {
 		fmt.Fprintf(os.Stderr, "Error: --start-date and --end-date are required (unless using --summary)\n\n")
 		flag.Usage()
-		os.Exit(ExitArgsError)
+		os.Exit(exitcodes.ArgsError)
 	}
 
 	// Validate transaction type
 	if *transactionType != "all" && *transactionType != "debit" && *transactionType != "credit" {
 		fmt.Fprintf(os.Stderr, "Error: --type must be 'debit', 'credit', or 'all' (got: %s)\n\n", *transactionType)
 		flag.Usage()
-		os.Exit(ExitArgsError)
+		os.Exit(exitcodes.ArgsError)
 	}
 
-	// Load database configuration
-	cfg, err := config.LoadFromEnv()
+	// Initialize database
+	database, err := app.InitDatabase()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Configuration error: %v\n", err)
-		os.Exit(ExitDBError)
-	}
-
-	// Connect to database
-	database, err := db.New(cfg.DatabasePath())
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to open database: %v\n", err)
-		os.Exit(ExitDBError)
+		fmt.Fprintf(os.Stderr, "Failed to initialize database: %v\n", err)
+		os.Exit(exitcodes.DBError)
 	}
 	defer database.Close()
 
@@ -116,52 +98,52 @@ func main() {
 		summaries, err := database.GetAccountSummary()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to retrieve account summary: %v\n", err)
-			os.Exit(ExitDBError)
+			os.Exit(exitcodes.DBError)
 		}
 
 		output, err := formatOutput(summaries, *pretty)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to format output: %v\n", err)
-			os.Exit(ExitDBError)
+			os.Exit(exitcodes.DBError)
 		}
 
 		fmt.Println(output)
-		os.Exit(ExitSuccess)
+		os.Exit(exitcodes.Success)
 	}
 
 	// Parse dates
 	startDate, err := time.Parse("2006-01-02", *startDateStr)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Invalid start date format (use YYYY-MM-DD): %v\n", err)
-		os.Exit(ExitArgsError)
+		os.Exit(exitcodes.ArgsError)
 	}
 
 	endDate, err := time.Parse("2006-01-02", *endDateStr)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Invalid end date format (use YYYY-MM-DD): %v\n", err)
-		os.Exit(ExitArgsError)
+		os.Exit(exitcodes.ArgsError)
 	}
 
 	// Validate date range
 	if endDate.Before(startDate) {
 		fmt.Fprintf(os.Stderr, "End date must be after start date\n")
-		os.Exit(ExitArgsError)
+		os.Exit(exitcodes.ArgsError)
 	}
 
 	// Query transactions with type filter
 	transactions, err := database.QueryTransactionsWithType(startDate, endDate, *account, *transactionType)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to query transactions: %v\n", err)
-		os.Exit(ExitDBError)
+		os.Exit(exitcodes.DBError)
 	}
 
 	// Handle CSV output
 	if *csvOutput {
 		if err := formatCSV(transactions); err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to format CSV output: %v\n", err)
-			os.Exit(ExitDBError)
+			os.Exit(exitcodes.DBError)
 		}
-		os.Exit(ExitSuccess)
+		os.Exit(exitcodes.Success)
 	}
 
 	// Organize transactions by account for JSON output
@@ -206,11 +188,11 @@ func main() {
 	output, err := formatOutput(result, *pretty)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to format output: %v\n", err)
-		os.Exit(ExitDBError)
+		os.Exit(exitcodes.DBError)
 	}
 
 	fmt.Println(output)
-	os.Exit(ExitSuccess)
+	os.Exit(exitcodes.Success)
 }
 
 // formatOutput formats data as JSON
