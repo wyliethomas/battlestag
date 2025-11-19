@@ -19,7 +19,7 @@ INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
 mkdir -p "$INSTALL_DIR"
 
 # Get config directory
-DEFAULT_CONFIG_DIR="$HOME/.config/financial-financial-asset-tracker"
+DEFAULT_CONFIG_DIR="$HOME/.config/financial-asset-tracker"
 read -p "Configuration directory [$DEFAULT_CONFIG_DIR]: " CONFIG_DIR
 CONFIG_DIR="${CONFIG_DIR:-$DEFAULT_CONFIG_DIR}"
 
@@ -104,7 +104,66 @@ echo
 echo "Configuration file:"
 echo "  $CONFIG_DIR/.env"
 echo
-echo "Make sure $INSTALL_DIR is in your PATH."
+
+# Check and update PATH
+echo "Checking PATH configuration..."
+
+# Detect shell and config file
+SHELL_CONFIG=""
+if [ -n "$BASH_VERSION" ]; then
+    if [ -f "$HOME/.bashrc" ]; then
+        SHELL_CONFIG="$HOME/.bashrc"
+    elif [ -f "$HOME/.bash_profile" ]; then
+        SHELL_CONFIG="$HOME/.bash_profile"
+    fi
+elif [ -n "$ZSH_VERSION" ]; then
+    SHELL_CONFIG="$HOME/.zshrc"
+else
+    # Fallback: check for common files
+    if [ -f "$HOME/.bashrc" ]; then
+        SHELL_CONFIG="$HOME/.bashrc"
+    elif [ -f "$HOME/.bash_profile" ]; then
+        SHELL_CONFIG="$HOME/.bash_profile"
+    elif [ -f "$HOME/.profile" ]; then
+        SHELL_CONFIG="$HOME/.profile"
+    fi
+fi
+
+# Check if PATH contains the install directory
+PATH_CONFIGURED=false
+if [ -n "$PATH" ]; then
+    if echo "$PATH" | grep -q "$INSTALL_DIR"; then
+        PATH_CONFIGURED=true
+    fi
+fi
+
+if [ "$PATH_CONFIGURED" = false ]; then
+    if [ -n "$SHELL_CONFIG" ]; then
+        echo "Adding $INSTALL_DIR to PATH in $SHELL_CONFIG"
+
+        # Create backup
+        cp "$SHELL_CONFIG" "${SHELL_CONFIG}.backup"
+
+        # Add PATH export
+        echo "" >> "$SHELL_CONFIG"
+        echo "# Added by financial-asset-tracker installer" >> "$SHELL_CONFIG"
+        echo "export PATH=\"\$HOME/.local/bin:\$PATH\"" >> "$SHELL_CONFIG"
+
+        echo "✓ PATH updated in $SHELL_CONFIG"
+        echo ""
+        echo "⚠️  IMPORTANT: Run this command to apply changes:"
+        echo "    source $SHELL_CONFIG"
+        echo ""
+        echo "Or log out and log back in."
+    else
+        echo "⚠️  Could not detect shell configuration file."
+        echo "   Please manually add this to your shell config (~/.bashrc or ~/.zshrc):"
+        echo "   export PATH=\"$INSTALL_DIR:\$PATH\""
+    fi
+else
+    echo "✓ $INSTALL_DIR is already in PATH"
+fi
+
 echo
 echo "Quick start:"
 echo "  financial-asset-tracker-run add --name \"My Asset\" --category other --current-value 1000"

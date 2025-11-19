@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "=== Asset Tracker Uninstallation ==="
+echo "=== Financial Asset Tracker Uninstallation ==="
 echo
 
 # Find existing wrapper to get directories
@@ -56,6 +56,51 @@ if [ -n "$DB_PATH" ] && [ -f "$DB_PATH" ]; then
         rm -f "$DB_PATH"
         rmdir "$(dirname "$DB_PATH")" 2>/dev/null || true
         echo "✓ Database removed"
+    fi
+fi
+
+# Offer to remove PATH entry
+read -p "Remove PATH entry from shell config? [y/N]: " REMOVE_PATH
+if [[ "$REMOVE_PATH" =~ ^[Yy]$ ]]; then
+    # Detect shell config file
+    SHELL_CONFIG=""
+    if [ -n "$BASH_VERSION" ]; then
+        if [ -f "$HOME/.bashrc" ]; then
+            SHELL_CONFIG="$HOME/.bashrc"
+        elif [ -f "$HOME/.bash_profile" ]; then
+            SHELL_CONFIG="$HOME/.bash_profile"
+        fi
+    elif [ -n "$ZSH_VERSION" ]; then
+        SHELL_CONFIG="$HOME/.zshrc"
+    else
+        # Fallback
+        if [ -f "$HOME/.bashrc" ]; then
+            SHELL_CONFIG="$HOME/.bashrc"
+        elif [ -f "$HOME/.bash_profile" ]; then
+            SHELL_CONFIG="$HOME/.bash_profile"
+        elif [ -f "$HOME/.profile" ]; then
+            SHELL_CONFIG="$HOME/.profile"
+        fi
+    fi
+
+    if [ -n "$SHELL_CONFIG" ] && [ -f "$SHELL_CONFIG" ]; then
+        # Check if our comment exists
+        if grep -q "# Added by financial-asset-tracker installer" "$SHELL_CONFIG"; then
+            # Create backup
+            cp "$SHELL_CONFIG" "${SHELL_CONFIG}.backup"
+
+            # Remove the lines (comment and export)
+            sed -i '/# Added by financial-asset-tracker installer/,+1d' "$SHELL_CONFIG"
+
+            echo "✓ PATH entry removed from $SHELL_CONFIG"
+            echo "  (Backup saved to ${SHELL_CONFIG}.backup)"
+            echo ""
+            echo "⚠️  Run 'source $SHELL_CONFIG' or restart your shell to apply changes."
+        else
+            echo "  No PATH entry found in $SHELL_CONFIG"
+        fi
+    else
+        echo "  Could not find shell configuration file"
     fi
 fi
 
