@@ -1,0 +1,17 @@
+# Binaries
+financial-liability-tracker
+
+# Environment configuration
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Go build artifacts
+*.o
+*.a
+*.so

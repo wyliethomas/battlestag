@@ -26,11 +26,7 @@ There should also be endpoints to allow me to CRUD assets.
 Financial Liability Agent
 
 
-This agent will need to track my loans as well as my credit cards. For loans it will need to be able to track the historical principle and interest payments. I will be able to upload a PDF at the begining of each month. This agent will also need to look for a new PDF on the first of each month, then try again on the second and third and so on until I upload a new PDF. It will need to process the PDF and update the data on the loan. 
-
-It will need to do the same for credit cards. I will upload credit card statements at the begining of the month. When the agent gets new data it will need to store each transaction.
-
-This agent will also need to expose endpoints that will let other agents query a date range for new data so they can analyze the data.
+A Go executable system that manages a database of financial liabilities including loans and credit cards, tracking current balances, interest rates, and payment obligations. The core executable provides CRUD operations for liabilities with support for different liability types (auto loans, mortgages, student loans, credit cards, personal loans). Each liability record stores the type, name, current balance, original amount, interest rate, minimum payment, creditor information, and account identifiers. Query executables provide access to current liability totals, individual liability details, and historical balance tracking over time for use by other financial agents like net worth calculators. The system maintains a balance history table to track how liabilities change over time, enabling trend analysis and payoff progress monitoring.
 
 
 ------------------------------------------------
