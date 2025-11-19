@@ -15,25 +15,10 @@ import (
 
 // QueryResult represents the output structure
 type QueryResult struct {
-	StartDate    string                       `json:"start_date"`
-	EndDate      string                       `json:"end_date"`
-	TotalRecords int                          `json:"total_records"`
-	Accounts     map[string][]TransactionJSON `json:"accounts"`
-}
-
-// TransactionJSON represents a transaction in JSON format
-type TransactionJSON struct {
-	ID              int64    `json:"id"`
-	AccountName     string   `json:"account_name"`
-	AccountLast4    string   `json:"account_last4"`
-	TransactionDate string   `json:"transaction_date"`
-	PostDate        *string  `json:"post_date,omitempty"`
-	Description     string   `json:"description"`
-	Amount          float64  `json:"amount"`
-	TransactionType string   `json:"transaction_type"`
-	Balance         *float64 `json:"balance,omitempty"`
-	StatementDate   string   `json:"statement_date"`
-	SourceFile      string   `json:"source_file"`
+	StartDate    string                  `json:"start_date"`
+	EndDate      string                  `json:"end_date"`
+	TotalRecords int                     `json:"total_records"`
+	Accounts     map[string][]*db.Transaction `json:"accounts"`
 }
 
 func main() {
@@ -147,33 +132,10 @@ func main() {
 	}
 
 	// Organize transactions by account for JSON output
-	accountMap := make(map[string][]TransactionJSON)
+	accountMap := make(map[string][]*db.Transaction)
 	for _, tx := range transactions {
 		accountKey := fmt.Sprintf("%s (...%s)", tx.AccountName, tx.AccountLast4)
-
-		// Convert transaction to JSON format
-		txJSON := TransactionJSON{
-			ID:              tx.ID,
-			AccountName:     tx.AccountName,
-			AccountLast4:    tx.AccountLast4,
-			TransactionDate: tx.TransactionDate.Format("2006-01-02"),
-			Description:     tx.Description,
-			Amount:          tx.Amount,
-			TransactionType: tx.TransactionType,
-			StatementDate:   tx.StatementDate.Format("2006-01-02"),
-			SourceFile:      tx.SourceFile,
-		}
-
-		if tx.PostDate != nil {
-			postDateStr := tx.PostDate.Format("2006-01-02")
-			txJSON.PostDate = &postDateStr
-		}
-
-		if tx.Balance != nil {
-			txJSON.Balance = tx.Balance
-		}
-
-		accountMap[accountKey] = append(accountMap[accountKey], txJSON)
+		accountMap[accountKey] = append(accountMap[accountKey], tx)
 	}
 
 	// Build result

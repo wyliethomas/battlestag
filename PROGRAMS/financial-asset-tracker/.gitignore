@@ -1,0 +1,21 @@
+# Binaries
+asset-tracker
+asset-tracker-query
+
+# Environment configuration
+.env
+
+# Database files
+*.db
+
+# Go build artifacts
+*.o
+*.a
+*.so
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

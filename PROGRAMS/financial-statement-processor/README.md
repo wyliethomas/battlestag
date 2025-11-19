@@ -178,14 +178,16 @@ financial-statement-query-run --summary --pretty
         "id": 1,
         "account_name": "Checking Account",
         "account_last4": "1234",
-        "transaction_date": "2024-10-15",
-        "post_date": "2024-10-16",
+        "transaction_date": "2024-10-15T00:00:00Z",
+        "post_date": "2024-10-16T00:00:00Z",
         "description": "PURCHASE AT GROCERY STORE",
         "amount": -52.34,
         "transaction_type": "debit",
         "balance": 1247.66,
-        "statement_date": "2024-10-31",
-        "source_file": "statement_oct_2024.pdf"
+        "statement_date": "2024-10-31T00:00:00Z",
+        "source_file": "statement_oct_2024.pdf",
+        "created_at": "2024-11-01T10:30:00Z",
+        "updated_at": "2024-11-01T10:30:00Z"
       }
     ]
   }

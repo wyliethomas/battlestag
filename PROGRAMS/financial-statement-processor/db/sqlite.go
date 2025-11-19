@@ -16,19 +16,19 @@ type DB struct {
 
 // Transaction represents a financial transaction
 type Transaction struct {
-	ID              int64
-	AccountName     string
-	AccountLast4    string
-	TransactionDate time.Time
-	PostDate        *time.Time
-	Description     string
-	Amount          float64
-	TransactionType string // "debit" or "credit"
-	Balance         *float64
-	StatementDate   time.Time
-	SourceFile      string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	ID              int64      `json:"id"`
+	AccountName     string     `json:"account_name"`
+	AccountLast4    string     `json:"account_last4"`
+	TransactionDate time.Time  `json:"transaction_date"`
+	PostDate        *time.Time `json:"post_date,omitempty"`
+	Description     string     `json:"description"`
+	Amount          float64    `json:"amount"`
+	TransactionType string     `json:"transaction_type"` // "debit" or "credit"
+	Balance         *float64   `json:"balance,omitempty"`
+	StatementDate   time.Time  `json:"statement_date"`
+	SourceFile      string     `json:"source_file"`
+	CreatedAt       time.Time  `json:"created_at,omitempty"`
+	UpdatedAt       time.Time  `json:"updated_at,omitempty"`
 }
 
 // ProcessingLog represents a statement processing record
