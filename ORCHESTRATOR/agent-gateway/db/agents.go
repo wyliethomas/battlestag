@@ -13,9 +13,12 @@ import (
 
 // Manager manages connections to all agent databases
 type Manager struct {
-	stoicDB *sql.DB
-	techDB  *sql.DB
-	config  *config.Config
+	stoicDB              *sql.DB
+	techDB               *sql.DB
+	financialStatementDB *sql.DB
+	financialAssetDB     *sql.DB
+	financialLiabilityDB *sql.DB
+	config               *config.Config
 }
 
 // NewManager creates a new database manager
@@ -42,6 +45,33 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 		mgr.techDB = db
 	}
 
+	// Connect to financial statement database
+	if cfg.Agents.FinancialStatement.DBPath != "" {
+		db, err := sql.Open("sqlite3", cfg.Agents.FinancialStatement.DBPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open financial statement database: %w", err)
+		}
+		mgr.financialStatementDB = db
+	}
+
+	// Connect to financial asset database
+	if cfg.Agents.FinancialAsset.DBPath != "" {
+		db, err := sql.Open("sqlite3", cfg.Agents.FinancialAsset.DBPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open financial asset database: %w", err)
+		}
+		mgr.financialAssetDB = db
+	}
+
+	// Connect to financial liability database
+	if cfg.Agents.FinancialLiability.DBPath != "" {
+		db, err := sql.Open("sqlite3", cfg.Agents.FinancialLiability.DBPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open financial liability database: %w", err)
+		}
+		mgr.financialLiabilityDB = db
+	}
+
 	return mgr, nil
 }
 
@@ -52,6 +82,15 @@ func (m *Manager) Close() error {
 	}
 	if m.techDB != nil {
 		m.techDB.Close()
+	}
+	if m.financialStatementDB != nil {
+		m.financialStatementDB.Close()
+	}
+	if m.financialAssetDB != nil {
+		m.financialAssetDB.Close()
+	}
+	if m.financialLiabilityDB != nil {
+		m.financialLiabilityDB.Close()
 	}
 	return nil
 }
@@ -335,6 +374,163 @@ func (m *Manager) GetTechAll(page, pageSize int) (*models.PaginatedResponse, err
 		TotalCount: totalCount,
 		TotalPages: totalPages,
 	}, nil
+}
+
+// Financial Database Operations
+
+// GetTransactionSummary gets aggregated transaction data
+func (m *Manager) GetTransactionSummary(startDate, endDate string) (*models.TransactionSummary, error) {
+	if m.financialStatementDB == nil {
+		return nil, fmt.Errorf("financial statement database not available")
+	}
+
+	summary := &models.TransactionSummary{
+		StartDate:    startDate,
+		EndDate:      endDate,
+		CountByType:  make(map[string]int),
+		AmountByType: make(map[string]float64),
+	}
+
+	// Get total amount and count
+	query := `SELECT COALESCE(SUM(amount), 0), COUNT(*) FROM transactions WHERE date >= ? AND date <= ?`
+	err := m.financialStatementDB.QueryRow(query, startDate, endDate).Scan(&summary.TotalAmount, &summary.TotalCount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get transaction totals: %w", err)
+	}
+
+	// Get counts by type
+	rows, err := m.financialStatementDB.Query(
+		`SELECT transaction_type, COUNT(*), SUM(amount) FROM transactions
+		 WHERE date >= ? AND date <= ?
+		 GROUP BY transaction_type`,
+		startDate, endDate,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get transaction breakdown: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var txnType string
+		var count int
+		var amount float64
+		if err := rows.Scan(&txnType, &count, &amount); err != nil {
+			return nil, fmt.Errorf("failed to scan transaction breakdown: %w", err)
+		}
+		summary.CountByType[txnType] = count
+		summary.AmountByType[txnType] = amount
+	}
+
+	return summary, nil
+}
+
+// GetAssetSummary gets aggregated asset data
+func (m *Manager) GetAssetSummary() (*models.AssetSummary, error) {
+	if m.financialAssetDB == nil {
+		return nil, fmt.Errorf("financial asset database not available")
+	}
+
+	summary := &models.AssetSummary{
+		CountByCategory: make(map[string]int),
+		ValueByCategory: make(map[string]float64),
+	}
+
+	// Get total value and count (excluding removed assets)
+	query := `SELECT COALESCE(SUM(current_value), 0), COUNT(*) FROM assets WHERE is_removed = 0`
+	err := m.financialAssetDB.QueryRow(query).Scan(&summary.TotalValue, &summary.TotalCount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get asset totals: %w", err)
+	}
+
+	// Get breakdown by category
+	rows, err := m.financialAssetDB.Query(
+		`SELECT category, COUNT(*), SUM(current_value) FROM assets
+		 WHERE is_removed = 0
+		 GROUP BY category`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get asset breakdown: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var category string
+		var count int
+		var value float64
+		if err := rows.Scan(&category, &count, &value); err != nil {
+			return nil, fmt.Errorf("failed to scan asset breakdown: %w", err)
+		}
+		summary.CountByCategory[category] = count
+		summary.ValueByCategory[category] = value
+	}
+
+	return summary, nil
+}
+
+// GetLiabilitySummary gets aggregated liability data
+func (m *Manager) GetLiabilitySummary() (*models.LiabilitySummary, error) {
+	if m.financialLiabilityDB == nil {
+		return nil, fmt.Errorf("financial liability database not available")
+	}
+
+	summary := &models.LiabilitySummary{
+		CountByType:   make(map[string]int),
+		BalanceByType: make(map[string]float64),
+	}
+
+	// Get total balance and count
+	query := `SELECT COALESCE(SUM(current_balance), 0), COUNT(*) FROM liabilities`
+	err := m.financialLiabilityDB.QueryRow(query).Scan(&summary.TotalBalance, &summary.TotalCount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get liability totals: %w", err)
+	}
+
+	// Get breakdown by type
+	rows, err := m.financialLiabilityDB.Query(
+		`SELECT liability_type, COUNT(*), SUM(current_balance) FROM liabilities
+		 GROUP BY liability_type`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get liability breakdown: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var liabilityType string
+		var count int
+		var balance float64
+		if err := rows.Scan(&liabilityType, &count, &balance); err != nil {
+			return nil, fmt.Errorf("failed to scan liability breakdown: %w", err)
+		}
+		summary.CountByType[liabilityType] = count
+		summary.BalanceByType[liabilityType] = balance
+	}
+
+	return summary, nil
+}
+
+// GetFinancialOverview gets a complete financial snapshot
+func (m *Manager) GetFinancialOverview() (*models.FinancialOverview, error) {
+	overview := &models.FinancialOverview{
+		Timestamp: time.Now(),
+	}
+
+	// Get asset totals
+	if m.financialAssetDB != nil {
+		query := `SELECT COALESCE(SUM(current_value), 0), COUNT(*) FROM assets WHERE is_removed = 0`
+		m.financialAssetDB.QueryRow(query).Scan(&overview.TotalAssets, &overview.AssetCount)
+	}
+
+	// Get liability totals
+	if m.financialLiabilityDB != nil {
+		query := `SELECT COALESCE(SUM(current_balance), 0), COUNT(*) FROM liabilities`
+		m.financialLiabilityDB.QueryRow(query).Scan(&overview.TotalLiabilities, &overview.LiabilityCount)
+	}
+
+	// Calculate net worth
+	overview.NetWorth = overview.TotalAssets - overview.TotalLiabilities
+
+	return overview, nil
 }
 
 // Health and Stats Operations

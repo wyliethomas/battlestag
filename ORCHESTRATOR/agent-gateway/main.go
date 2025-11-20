@@ -54,12 +54,18 @@ func main() {
 	exec := executor.NewExecutor(
 		cfg.Agents.Stoic.ExecutablePath,
 		cfg.Agents.Tech.ExecutablePath,
+		cfg.Agents.FinancialStatement.ExecutablePath,
+		cfg.Agents.FinancialAsset.ExecutablePath,
+		cfg.Agents.FinancialLiability.ExecutablePath,
 	)
 	log.Println("Program executor initialized")
 
 	// Initialize database manager (optional, for advanced features)
 	var dbManager *db.Manager
-	if cfg.Agents.Stoic.DBPath != "" || cfg.Agents.Tech.DBPath != "" {
+	if cfg.Agents.Stoic.DBPath != "" || cfg.Agents.Tech.DBPath != "" ||
+		cfg.Agents.FinancialStatement.DBPath != "" ||
+		cfg.Agents.FinancialAsset.DBPath != "" ||
+		cfg.Agents.FinancialLiability.DBPath != "" {
 		dbManager, err = db.NewManager(cfg)
 		if err != nil {
 			log.Printf("Warning: Failed to initialize database manager: %v", err)
@@ -74,6 +80,12 @@ func main() {
 	stoicHandler := handlers.NewStoicHandler(dbManager, exec)
 	techHandler := handlers.NewTechHandler(dbManager, exec)
 	metaHandler := handlers.NewMetaHandler(dbManager, startTime)
+
+	// Financial handlers
+	financialStatementHandler := handlers.NewFinancialStatementHandler(exec, dbManager)
+	financialAssetHandler := handlers.NewFinancialAssetHandler(exec, dbManager)
+	financialLiabilityHandler := handlers.NewFinancialLiabilityHandler(exec, dbManager)
+	financialOverviewHandler := handlers.NewFinancialOverviewHandler(dbManager)
 
 	// Create middleware
 	auth := middleware.NewAuthMiddleware(cfg.Auth.APIKey)
@@ -109,6 +121,33 @@ func main() {
 	router.HandleFunc("/api/tech/latest/{n}", logMiddleware(auth.Authenticate(techHandler.GetLatest))).Methods("GET", "OPTIONS")
 	router.HandleFunc("/api/tech/category/{category}", logMiddleware(auth.Authenticate(techHandler.GetByCategory))).Methods("GET", "OPTIONS")
 	router.HandleFunc("/api/tech/all", logMiddleware(auth.Authenticate(techHandler.GetAll))).Methods("GET", "OPTIONS")
+
+	// Financial Statement endpoints (require auth)
+	router.HandleFunc("/api/financial-statement/process", logMiddleware(auth.Authenticate(financialStatementHandler.ProcessPDF))).Methods("POST", "OPTIONS")
+	router.HandleFunc("/api/financial-statement/transactions", logMiddleware(auth.Authenticate(financialStatementHandler.QueryTransactions))).Methods("GET", "OPTIONS")
+	router.HandleFunc("/api/financial-statement/summary", logMiddleware(auth.Authenticate(financialStatementHandler.GetSummary))).Methods("GET", "OPTIONS")
+
+	// Financial Asset endpoints (require auth)
+	router.HandleFunc("/api/financial-asset", logMiddleware(auth.Authenticate(financialAssetHandler.AddAsset))).Methods("POST", "OPTIONS")
+	router.HandleFunc("/api/financial-asset", logMiddleware(auth.Authenticate(financialAssetHandler.ListAssets))).Methods("GET", "OPTIONS")
+	router.HandleFunc("/api/financial-asset/summary", logMiddleware(auth.Authenticate(financialAssetHandler.GetSummary))).Methods("GET", "OPTIONS")
+	router.HandleFunc("/api/financial-asset/{name}", logMiddleware(auth.Authenticate(financialAssetHandler.GetAsset))).Methods("GET", "OPTIONS")
+	router.HandleFunc("/api/financial-asset/{name}", logMiddleware(auth.Authenticate(financialAssetHandler.UpdateAsset))).Methods("PUT", "OPTIONS")
+	router.HandleFunc("/api/financial-asset/{name}", logMiddleware(auth.Authenticate(financialAssetHandler.RemoveAsset))).Methods("DELETE", "OPTIONS")
+	router.HandleFunc("/api/financial-asset/{name}/restore", logMiddleware(auth.Authenticate(financialAssetHandler.RestoreAsset))).Methods("POST", "OPTIONS")
+
+	// Financial Liability endpoints (require auth)
+	router.HandleFunc("/api/financial-liability", logMiddleware(auth.Authenticate(financialLiabilityHandler.AddLiability))).Methods("POST", "OPTIONS")
+	router.HandleFunc("/api/financial-liability", logMiddleware(auth.Authenticate(financialLiabilityHandler.ListLiabilities))).Methods("GET", "OPTIONS")
+	router.HandleFunc("/api/financial-liability/total", logMiddleware(auth.Authenticate(financialLiabilityHandler.GetTotal))).Methods("GET", "OPTIONS")
+	router.HandleFunc("/api/financial-liability/summary", logMiddleware(auth.Authenticate(financialLiabilityHandler.GetSummary))).Methods("GET", "OPTIONS")
+	router.HandleFunc("/api/financial-liability/{name}", logMiddleware(auth.Authenticate(financialLiabilityHandler.GetLiability))).Methods("GET", "OPTIONS")
+	router.HandleFunc("/api/financial-liability/{name}", logMiddleware(auth.Authenticate(financialLiabilityHandler.UpdateLiability))).Methods("PUT", "OPTIONS")
+	router.HandleFunc("/api/financial-liability/{name}", logMiddleware(auth.Authenticate(financialLiabilityHandler.DeleteLiability))).Methods("DELETE", "OPTIONS")
+
+	// Financial Overview endpoints (require auth)
+	router.HandleFunc("/api/financial/net-worth", logMiddleware(auth.Authenticate(financialOverviewHandler.GetNetWorth))).Methods("GET", "OPTIONS")
+	router.HandleFunc("/api/financial/summary", logMiddleware(auth.Authenticate(financialOverviewHandler.GetSummary))).Methods("GET", "OPTIONS")
 
 	// Root endpoint
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

@@ -17,8 +17,11 @@ type Config struct {
 
 // AgentsConfig contains database paths for all agents
 type AgentsConfig struct {
-	Stoic StoicConfig `yaml:"stoic"`
-	Tech  TechConfig  `yaml:"tech"`
+	Stoic              StoicConfig              `yaml:"stoic"`
+	Tech               TechConfig               `yaml:"tech"`
+	FinancialStatement FinancialStatementConfig `yaml:"financial_statement"`
+	FinancialAsset     FinancialAssetConfig     `yaml:"financial_asset"`
+	FinancialLiability FinancialLiabilityConfig `yaml:"financial_liability"`
 }
 
 // StoicConfig contains configuration for stoic thoughts agent
@@ -29,6 +32,24 @@ type StoicConfig struct {
 
 // TechConfig contains configuration for tech tips agent
 type TechConfig struct {
+	ExecutablePath string `yaml:"executable_path"`
+	DBPath         string `yaml:"db_path"` // Optional: for advanced features
+}
+
+// FinancialStatementConfig contains configuration for financial statement processor
+type FinancialStatementConfig struct {
+	ExecutablePath string `yaml:"executable_path"`
+	DBPath         string `yaml:"db_path"` // Optional: for advanced features
+}
+
+// FinancialAssetConfig contains configuration for financial asset tracker
+type FinancialAssetConfig struct {
+	ExecutablePath string `yaml:"executable_path"`
+	DBPath         string `yaml:"db_path"` // Optional: for advanced features
+}
+
+// FinancialLiabilityConfig contains configuration for financial liability tracker
+type FinancialLiabilityConfig struct {
 	ExecutablePath string `yaml:"executable_path"`
 	DBPath         string `yaml:"db_path"` // Optional: for advanced features
 }
@@ -97,6 +118,24 @@ func Load(configPath string) (*Config, error) {
 	if techDB := os.Getenv("TECH_DB_PATH"); techDB != "" {
 		cfg.Agents.Tech.DBPath = techDB
 	}
+	if fsExec := os.Getenv("FINANCIAL_STATEMENT_EXECUTABLE"); fsExec != "" {
+		cfg.Agents.FinancialStatement.ExecutablePath = fsExec
+	}
+	if fsDB := os.Getenv("FINANCIAL_STATEMENT_DB_PATH"); fsDB != "" {
+		cfg.Agents.FinancialStatement.DBPath = fsDB
+	}
+	if faExec := os.Getenv("FINANCIAL_ASSET_EXECUTABLE"); faExec != "" {
+		cfg.Agents.FinancialAsset.ExecutablePath = faExec
+	}
+	if faDB := os.Getenv("FINANCIAL_ASSET_DB_PATH"); faDB != "" {
+		cfg.Agents.FinancialAsset.DBPath = faDB
+	}
+	if flExec := os.Getenv("FINANCIAL_LIABILITY_EXECUTABLE"); flExec != "" {
+		cfg.Agents.FinancialLiability.ExecutablePath = flExec
+	}
+	if flDB := os.Getenv("FINANCIAL_LIABILITY_DB_PATH"); flDB != "" {
+		cfg.Agents.FinancialLiability.DBPath = flDB
+	}
 
 	// Validate required fields
 	if cfg.Auth.APIKey == "" {
@@ -107,6 +146,15 @@ func Load(configPath string) (*Config, error) {
 	}
 	if cfg.Agents.Tech.ExecutablePath == "" {
 		return nil, fmt.Errorf("Tech executable path is required")
+	}
+	if cfg.Agents.FinancialStatement.ExecutablePath == "" {
+		return nil, fmt.Errorf("Financial Statement executable path is required")
+	}
+	if cfg.Agents.FinancialAsset.ExecutablePath == "" {
+		return nil, fmt.Errorf("Financial Asset executable path is required")
+	}
+	if cfg.Agents.FinancialLiability.ExecutablePath == "" {
+		return nil, fmt.Errorf("Financial Liability executable path is required")
 	}
 
 	return cfg, nil
