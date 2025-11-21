@@ -47,6 +47,13 @@ echo "Building executables..."
 go build -o financial-asset-tracker ./cmd/tracker
 go build -o financial-asset-tracker-query ./cmd/query
 
+# Install binaries
+echo "Installing binaries..."
+cp financial-asset-tracker "$INSTALL_DIR/"
+cp financial-asset-tracker-query "$INSTALL_DIR/"
+chmod +x "$INSTALL_DIR/financial-asset-tracker"
+chmod +x "$INSTALL_DIR/financial-asset-tracker-query"
+
 # Create .env file
 cat > "$CONFIG_DIR/.env" <<EOF
 # Asset Tracker Configuration
@@ -70,7 +77,7 @@ if [ -f "\$CONFIG_DIR/.env" ]; then
 fi
 
 # Run the executable
-exec "$PWD/financial-asset-tracker" "\$@"
+exec "$INSTALL_DIR/financial-asset-tracker" "\$@"
 EOF
 
 # Query wrapper
@@ -87,7 +94,7 @@ if [ -f "\$CONFIG_DIR/.env" ]; then
 fi
 
 # Run the executable
-exec "$PWD/financial-asset-tracker-query" "\$@"
+exec "$INSTALL_DIR/financial-asset-tracker-query" "\$@"
 EOF
 
 # Make wrappers executable
@@ -96,6 +103,10 @@ chmod +x "$INSTALL_DIR/financial-asset-tracker-query-run"
 
 echo
 echo "✓ Installation complete!"
+echo
+echo "Binaries installed:"
+echo "  $INSTALL_DIR/financial-asset-tracker"
+echo "  $INSTALL_DIR/financial-asset-tracker-query"
 echo
 echo "Wrapper scripts installed:"
 echo "  $INSTALL_DIR/financial-asset-tracker-run"

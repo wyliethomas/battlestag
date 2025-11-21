@@ -41,7 +41,14 @@ echo "Rebuilding executables..."
 go build -o financial-asset-tracker ./cmd/tracker
 go build -o financial-asset-tracker-query ./cmd/query
 
-# Recreate wrapper scripts (in case PWD changed)
+# Install binaries
+echo "Installing binaries..."
+cp financial-asset-tracker "$INSTALL_DIR/"
+cp financial-asset-tracker-query "$INSTALL_DIR/"
+chmod +x "$INSTALL_DIR/financial-asset-tracker"
+chmod +x "$INSTALL_DIR/financial-asset-tracker-query"
+
+# Recreate wrapper scripts
 echo "Recreating wrapper scripts..."
 
 # Tracker wrapper
@@ -58,7 +65,7 @@ if [ -f "\$CONFIG_DIR/.env" ]; then
 fi
 
 # Run the executable
-exec "$PWD/financial-asset-tracker" "\$@"
+exec "$INSTALL_DIR/financial-asset-tracker" "\$@"
 EOF
 
 # Query wrapper
@@ -75,7 +82,7 @@ if [ -f "\$CONFIG_DIR/.env" ]; then
 fi
 
 # Run the executable
-exec "$PWD/financial-asset-tracker-query" "\$@"
+exec "$INSTALL_DIR/financial-asset-tracker-query" "\$@"
 EOF
 
 chmod +x "$INSTALL_DIR/financial-asset-tracker-run"
@@ -83,4 +90,8 @@ chmod +x "$INSTALL_DIR/financial-asset-tracker-query-run"
 
 echo
 echo "✓ Update complete!"
+echo
+echo "Binaries updated:"
+echo "  $INSTALL_DIR/financial-asset-tracker"
+echo "  $INSTALL_DIR/financial-asset-tracker-query"
 echo
