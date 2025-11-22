@@ -15,6 +15,7 @@ import (
 	"agent-gateway/db"
 	"agent-gateway/executor"
 	"agent-gateway/handlers"
+	"agent-gateway/llm"
 	"agent-gateway/middleware"
 
 	"github.com/gorilla/mux"
@@ -87,6 +88,16 @@ func main() {
 	financialLiabilityHandler := handlers.NewFinancialLiabilityHandler(exec, dbManager)
 	financialOverviewHandler := handlers.NewFinancialOverviewHandler(dbManager)
 
+	// Initialize LLM client and handler (optional)
+	llmClient := llm.NewClient(
+		cfg.LLM.Endpoint,
+		cfg.LLM.Model,
+		cfg.LLM.SystemPrompt,
+		time.Duration(cfg.LLM.Timeout)*time.Second,
+	)
+	llmHandler := handlers.NewLLMHandler(llmClient)
+	log.Printf("LLM client initialized (endpoint: %s, model: %s)", cfg.LLM.Endpoint, cfg.LLM.Model)
+
 	// Create middleware
 	auth := middleware.NewAuthMiddleware(cfg.Auth.APIKey)
 	logMiddleware := middleware.Logging(accessLog)
@@ -148,6 +159,10 @@ func main() {
 	// Financial Overview endpoints (require auth)
 	router.HandleFunc("/api/financial/net-worth", logMiddleware(auth.Authenticate(financialOverviewHandler.GetNetWorth))).Methods("GET", "OPTIONS")
 	router.HandleFunc("/api/financial/summary", logMiddleware(auth.Authenticate(financialOverviewHandler.GetSummary))).Methods("GET", "OPTIONS")
+
+	// LLM endpoints (require auth)
+	router.HandleFunc("/api/llm/chat", logMiddleware(auth.Authenticate(llmHandler.Chat))).Methods("POST", "OPTIONS")
+	router.HandleFunc("/api/llm/health", logMiddleware(auth.Authenticate(llmHandler.Health))).Methods("GET", "OPTIONS")
 
 	// Root endpoint
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

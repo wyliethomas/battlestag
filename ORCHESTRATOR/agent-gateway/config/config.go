@@ -9,10 +9,11 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	Agents AgentsConfig `yaml:"agents"`
-	Server ServerConfig `yaml:"server"`
-	Auth   AuthConfig   `yaml:"auth"`
+	Agents  AgentsConfig  `yaml:"agents"`
+	Server  ServerConfig  `yaml:"server"`
+	Auth    AuthConfig    `yaml:"auth"`
 	Logging LoggingConfig `yaml:"logging"`
+	LLM     LLMConfig     `yaml:"llm"`
 }
 
 // AgentsConfig contains database paths for all agents
@@ -71,6 +72,14 @@ type LoggingConfig struct {
 	ErrorLog  string `yaml:"error_log"`
 }
 
+// LLMConfig contains LLM (Language Model) configuration
+type LLMConfig struct {
+	Endpoint     string `yaml:"endpoint"`      // Ollama server endpoint
+	Model        string `yaml:"model"`         // Model name (e.g., "llama3.2:8b")
+	Timeout      int    `yaml:"timeout"`       // Timeout in seconds
+	SystemPrompt string `yaml:"system_prompt"` // System prompt for the assistant
+}
+
 // Load reads configuration from file and environment variables
 func Load(configPath string) (*Config, error) {
 	cfg := &Config{
@@ -81,6 +90,12 @@ func Load(configPath string) (*Config, error) {
 		Logging: LoggingConfig{
 			AccessLog: "logs/access.log",
 			ErrorLog:  "logs/error.log",
+		},
+		LLM: LLMConfig{
+			Endpoint:     "http://192.168.1.232:11434",
+			Model:        "llama3.2:8b",
+			Timeout:      30,
+			SystemPrompt: "You are a helpful financial assistant helping manage personal finances.",
 		},
 	}
 
@@ -135,6 +150,23 @@ func Load(configPath string) (*Config, error) {
 	}
 	if flDB := os.Getenv("FINANCIAL_LIABILITY_DB_PATH"); flDB != "" {
 		cfg.Agents.FinancialLiability.DBPath = flDB
+	}
+	if llmEndpoint := os.Getenv("LLM_ENDPOINT"); llmEndpoint != "" {
+		cfg.LLM.Endpoint = llmEndpoint
+	}
+	if llmModel := os.Getenv("LLM_MODEL"); llmModel != "" {
+		cfg.LLM.Model = llmModel
+	}
+	if llmTimeout := os.Getenv("LLM_TIMEOUT"); llmTimeout != "" {
+		// Parse timeout as integer
+		var timeout int
+		fmt.Sscanf(llmTimeout, "%d", &timeout)
+		if timeout > 0 {
+			cfg.LLM.Timeout = timeout
+		}
+	}
+	if llmPrompt := os.Getenv("LLM_SYSTEM_PROMPT"); llmPrompt != "" {
+		cfg.LLM.SystemPrompt = llmPrompt
 	}
 
 	// Validate required fields
