@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/battlestag/agent-gateway/llm"
-	"github.com/battlestag/agent-gateway/models"
+	"agent-gateway/llm"
+	"agent-gateway/models"
 )
 
 // LLMHandler handles LLM chat requests
