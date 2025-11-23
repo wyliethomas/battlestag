@@ -7,8 +7,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/battlestag/battlestag-tui/client"
-	"github.com/battlestag/battlestag-tui/models"
+	"battlestag/client"
+	"battlestag/models"
 )
 
 // DashboardModel represents the dashboard screen state

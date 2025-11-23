@@ -6,69 +6,62 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/battlestag/battlestag-tui/client"
-	"github.com/battlestag/battlestag-tui/config"
+	"battlestag/client"
+	"battlestag/config"
 )
 
-// Screen represents different views in the TUI
-type Screen int
+// ViewMode represents the current view mode
+type ViewMode int
 
 const (
-	OnboardingScreen Screen = iota
-	DashboardScreen
-	AssetsScreen
-	LiabilitiesScreen
-	UploadScreen
-	SettingsScreen
-	HelpScreen
+	OnboardingMode ViewMode = iota
+	ChatMode
+	CommandPaletteMode
 )
 
 // Model represents the main application state
 type Model struct {
-	client        *client.Client
-	config        *config.Config
-	currentScreen Screen
-	width         int
-	height        int
-	err           error
-	statusMsg     string
+	client    *client.Client
+	config    *config.Config
+	mode      ViewMode
+	width     int
+	height    int
+	err       error
+	statusMsg string
 
-	// Sub-models for different screens
-	onboarding   *OnboardingModel
-	dashboard    *DashboardModel
-	assets       *AssetsModel
-	liabilities  *LiabilitiesModel
-	upload       *UploadModel
-	settings     *SettingsModel
+	// Core components
+	onboarding *OnboardingModel
+	chat       *ChatModel
+	prompt     PromptModel
+
+	// State
+	waitingForLLM bool
 }
 
 // NewModel creates a new application model
 func NewModel(apiClient *client.Client, cfg *config.Config, showOnboarding bool) Model {
-	startScreen := DashboardScreen
+	startMode := ChatMode
 	var onboarding *OnboardingModel
 
 	if showOnboarding {
-		startScreen = OnboardingScreen
+		startMode = OnboardingMode
 		onboarding = NewOnboardingModel()
 	}
 
 	return Model{
-		client:        apiClient,
-		config:        cfg,
-		currentScreen: startScreen,
-		onboarding:    onboarding,
-		dashboard:     NewDashboardModel(apiClient),
-		assets:        NewAssetsModel(apiClient),
-		liabilities:   NewLiabilitiesModel(apiClient),
-		upload:        NewUploadModel(apiClient),
-		settings:      NewSettingsModel(cfg),
+		client:     apiClient,
+		config:     cfg,
+		mode:       startMode,
+		onboarding: onboarding,
+		chat:       NewChatModel(apiClient),
+		prompt:     NewPromptModel(),
 	}
 }
 
 // Init initializes the application
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
-		m.dashboard.Init(),
+		m.prompt.Init(),
 		tea.EnterAltScreen,
 	)
 }
@@ -81,93 +74,84 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		// Update chat view size (leave room for header and prompt)
+		m.chat.SetSize(msg.Width, msg.Height-10)
 		return m, nil
 
 	case ConfigSavedMsg:
-		// Config was saved from onboarding, reload and start app
-		if m.currentScreen == OnboardingScreen {
-			m.currentScreen = DashboardScreen
-			return m, m.dashboard.Refresh()
+		// Config was saved from onboarding, start chat mode
+		if m.mode == OnboardingMode {
+			m.mode = ChatMode
 		}
 		return m, nil
 
-	case tea.KeyMsg:
-		// Don't allow quitting or tab switching during onboarding
-		if m.currentScreen == OnboardingScreen {
-			break
+	case ChatSubmitMsg:
+		// User submitted a chat message
+		if !m.waitingForLLM {
+			m.chat.AddUserMessage(msg.message)
+			m.waitingForLLM = true
+			m.chat.SetLoading(true)
+			return m, m.sendChatMessage(msg.message)
 		}
+		return m, nil
 
+	case ChatResponseMsg:
+		// Received response from LLM
+		m.waitingForLLM = false
+		m.chat.SetLoading(false)
+		m.chat.AddAssistantMessage(msg.message, msg.suggestedCommands)
+		return m, nil
+
+	case CommandSubmitMsg:
+		// User submitted a command
+		m.statusMsg = fmt.Sprintf("Command: %s (commands not yet implemented)", msg.command)
+		// TODO: Implement command execution
+		return m, nil
+
+	case ShowCommandPaletteMsg:
+		// Show command palette
+		m.statusMsg = "Command palette coming soon! Type your command after /"
+		// TODO: Implement command palette
+		return m, nil
+
+	case tea.KeyMsg:
+		// Global key handlers
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c", "ctrl+d":
 			return m, tea.Quit
 
-		case "1":
-			m.currentScreen = DashboardScreen
-			return m, m.dashboard.Refresh()
-
-		case "2":
-			m.currentScreen = AssetsScreen
-			return m, m.assets.Refresh()
-
-		case "3":
-			m.currentScreen = LiabilitiesScreen
-			return m, m.liabilities.Refresh()
-
-		case "4":
-			m.currentScreen = UploadScreen
-			return m, nil
-
-		case "5", "s":
-			m.currentScreen = SettingsScreen
-			return m, nil
-
-		case "?":
-			m.currentScreen = HelpScreen
+		case "ctrl+l":
+			// Clear chat
+			m.chat.Clear()
+			m.statusMsg = "Chat cleared"
 			return m, nil
 		}
 
 	case ErrorMsg:
 		m.err = msg.err
-		return m, nil
-
-	case StatusMsg:
-		m.statusMsg = msg.message
+		m.statusMsg = fmt.Sprintf("Error: %v", msg.err)
+		m.waitingForLLM = false
+		m.chat.SetLoading(false)
+		m.chat.AddErrorMessage(msg.err)
 		return m, nil
 	}
 
-	// Route updates to the current screen's model
-	switch m.currentScreen {
-	case OnboardingScreen:
+	// Route updates based on current mode
+	switch m.mode {
+	case OnboardingMode:
 		if m.onboarding != nil {
 			onboarding, cmd := m.onboarding.Update(msg)
 			m.onboarding = &onboarding
 			cmds = append(cmds, cmd)
 		}
 
-	case DashboardScreen:
-		dashboard, cmd := m.dashboard.Update(msg)
-		m.dashboard = &dashboard
-		cmds = append(cmds, cmd)
-
-	case AssetsScreen:
-		assets, cmd := m.assets.Update(msg)
-		m.assets = &assets
-		cmds = append(cmds, cmd)
-
-	case LiabilitiesScreen:
-		liabilities, cmd := m.liabilities.Update(msg)
-		m.liabilities = &liabilities
-		cmds = append(cmds, cmd)
-
-	case UploadScreen:
-		upload, cmd := m.upload.Update(msg)
-		m.upload = &upload
-		cmds = append(cmds, cmd)
-
-	case SettingsScreen:
-		settings, cmd := m.settings.Update(msg)
-		m.settings = &settings
-		cmds = append(cmds, cmd)
+	case ChatMode:
+		// Update prompt (always active in chat mode)
+		var promptCmd tea.Cmd
+		m.prompt, promptCmd = m.prompt.Update(msg)
+		if promptCmd != nil {
+			cmds = append(cmds, promptCmd)
+		}
 	}
 
 	return m, tea.Batch(cmds...)
@@ -179,56 +163,37 @@ func (m Model) View() string {
 		return "Loading..."
 	}
 
-	var content string
-
-	// Render the current screen
-	switch m.currentScreen {
-	case OnboardingScreen:
+	// Show onboarding if in onboarding mode
+	if m.mode == OnboardingMode {
 		if m.onboarding != nil {
-			return m.onboarding.View() // Onboarding is full-screen
+			return m.onboarding.View()
 		}
-	case DashboardScreen:
-		content = m.dashboard.View()
-	case AssetsScreen:
-		content = m.assets.View()
-	case LiabilitiesScreen:
-		content = m.liabilities.View()
-	case UploadScreen:
-		content = m.upload.View()
-	case SettingsScreen:
-		content = m.settings.View()
-	case HelpScreen:
-		content = m.renderHelp()
 	}
 
-	// Build the full view
+	// Build chat mode view
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
 		m.renderHeader(),
-		m.renderTabs(),
-		content,
+		m.renderChatArea(),
 		m.renderFooter(),
+		m.prompt.View(),
 	)
 }
 
 // renderHeader renders the application header
 func (m Model) renderHeader() string {
-	title := headerStyle.Render("BATTLESTAG TUI")
+	title := headerStyle.Render("BATTLESTAG")
 
-	// Check connection status
-	status := "Checking..."
+	// Connection status
+	status := "Connected"
 	statusStyle := statusConnected
-
 	if m.err != nil {
-		status = "Disconnected"
+		status = "Error"
 		statusStyle = statusDisconnected
-	} else {
-		status = "Connected"
 	}
-
 	statusText := statusStyle.Render(status)
 
-	// Build header with title and status
+	// Build header
 	spacer := strings.Repeat(" ", max(0, m.width-lipgloss.Width(title)-lipgloss.Width(statusText)-4))
 
 	return statusBarStyle.Width(m.width).Render(
@@ -236,78 +201,57 @@ func (m Model) renderHeader() string {
 	)
 }
 
-// renderTabs renders the navigation tabs
-func (m Model) renderTabs() string {
-	tabs := []struct {
-		name   string
-		screen Screen
-		key    string
-	}{
-		{"Dashboard", DashboardScreen, "1"},
-		{"Assets", AssetsScreen, "2"},
-		{"Liabilities", LiabilitiesScreen, "3"},
-		{"Upload", UploadScreen, "4"},
-		{"Settings", SettingsScreen, "5"},
-	}
+// renderChatArea renders the main chat conversation area
+func (m Model) renderChatArea() string {
+	// Calculate available height for chat (subtract header, footer, prompt)
+	chatHeight := m.height - 8
 
-	var renderedTabs []string
-	for _, tab := range tabs {
-		style := tabStyle
-		if tab.screen == m.currentScreen {
-			style = activeTabStyle
-		}
-		renderedTabs = append(renderedTabs, style.Render(fmt.Sprintf("[%s] %s", tab.key, tab.name)))
-	}
+	chatView := m.chat.View()
 
+	// Create scrollable area
 	return lipgloss.NewStyle().
-		Padding(1, 0).
-		Render(lipgloss.JoinHorizontal(lipgloss.Top, renderedTabs...))
+		Width(m.width).
+		Height(chatHeight).
+		Padding(1, 2).
+		Render(chatView)
 }
 
-// renderFooter renders the application footer
+// renderFooter renders the application footer with help text
 func (m Model) renderFooter() string {
-	help := helpStyle.Render("[1-4] Switch tabs • [?] Help • [q] Quit")
+	var help string
 
-	var statusMsg string
-	if m.err != nil {
-		statusMsg = errorStyle.Render(fmt.Sprintf("Error: %v", m.err))
-	} else if m.statusMsg != "" {
-		statusMsg = infoStyle.Render(m.statusMsg)
+	if m.waitingForLLM {
+		help = helpStyle.Render("Waiting for response...")
+	} else {
+		help = helpStyle.Render("[/] Commands • [Ctrl+L] Clear chat • [Ctrl+C] Quit")
 	}
 
-	footer := lipgloss.JoinVertical(lipgloss.Left, statusMsg, help)
-	return footer
+	var statusLine string
+	if m.statusMsg != "" {
+		statusLine = infoStyle.Render(m.statusMsg)
+	}
+
+	footer := lipgloss.JoinVertical(lipgloss.Left, statusLine, help)
+	return footerStyle.Width(m.width).Render(footer)
 }
 
-// renderHelp renders the help screen
-func (m Model) renderHelp() string {
-	help := `
-BATTLESTAG TUI - Help
+// sendChatMessage sends a message to the LLM API
+func (m *Model) sendChatMessage(message string) tea.Cmd {
+	return func() tea.Msg {
+		// Get conversation history
+		history := m.chat.GetHistory()
 
-Navigation:
-  [1] - Dashboard     View financial overview and daily insights
-  [2] - Assets        Manage your financial assets
-  [3] - Liabilities   Manage your liabilities
-  [4] - Upload        Upload PDF bank statements
-  [?] - Help          Show this help screen
-  [q] - Quit          Exit the application
+		// Send to LLM
+		response, err := m.client.Chat(message, history)
+		if err != nil {
+			return ErrorMsg{err: err}
+		}
 
-Screen-specific controls:
-  [↑/↓] - Navigate lists
-  [Enter] - Select item
-  [n] - New item (Assets/Liabilities screens)
-  [e] - Edit selected item
-  [d] - Delete selected item
-  [r] - Refresh data
-  [Esc] - Cancel/Go back
-
-Environment Variables:
-  AGENT_GATEWAY_URL     - API endpoint (default: http://localhost:8080)
-  AGENT_GATEWAY_API_KEY - API authentication key
-
-Press any key to return to the previous screen.
-`
-	return boxStyle.Width(m.width - 4).Render(help)
+		return ChatResponseMsg{
+			message:           response.Message,
+			suggestedCommands: response.SuggestedCommands,
+		}
+	}
 }
 
 // Helper function for max
@@ -319,10 +263,29 @@ func max(a, b int) int {
 }
 
 // Custom messages
+
+// ChatResponseMsg contains the LLM response
+type ChatResponseMsg struct {
+	message           string
+	suggestedCommands []string
+}
+
+// ErrorMsg represents an error message
 type ErrorMsg struct {
 	err error
 }
 
+// StatusMsg represents a status message
 type StatusMsg struct {
 	message string
 }
+
+// Styles specific to app.go (non-duplicates)
+
+var (
+	footerStyle = lipgloss.NewStyle().
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderTop(true).
+			BorderForeground(lipgloss.Color("240")).
+			Padding(0, 1)
+)

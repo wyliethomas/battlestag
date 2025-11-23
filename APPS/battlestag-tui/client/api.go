@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/battlestag/battlestag-tui/models"
+	"battlestag/models"
 )
 
 // Client represents the API client

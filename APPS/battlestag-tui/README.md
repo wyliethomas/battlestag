@@ -1,98 +1,113 @@
-# BATTLESTAG TUI
+# Battlestag TUI
 
-A terminal user interface (TUI) client for the BATTLESTAG Agent Gateway API.
+A Claude Code-style terminal user interface for managing personal finances with AI assistance.
 
 ## Features
 
-- **Dashboard**: View financial overview, net worth, and daily stoic thoughts
-- **Asset Management**: Track and manage financial assets
-- **Liability Management**: Monitor credit cards, loans, and other liabilities
-- **PDF Upload**: Upload and process bank statements
-- **Real-time Updates**: Refresh data on demand
+- **AI-Powered Chat**: Conversational interface powered by local LLM (via Ollama)
+- **Always-Visible Prompt**: Input line at the bottom for unified interaction
+- **Command System**: Type "/" to access commands (command palette coming soon)
+- **Financial Management**: Integration with Agent Gateway for assets, liabilities, and financial data
+- **Global Command**: Accessible from any terminal after installation
+
+## Architecture
+
+The TUI follows a Claude Code-inspired design:
+
+- **Chat Mode**: Default view showing AI conversation history
+- **Prompt Line**: Always visible at bottom for input
+- **No Tabs**: Command-driven navigation instead of numbered tabs
+- **Unified Input**:
+  - Regular text → sent to AI chat
+  - Text starting with "/" → executed as command
 
 ## Installation
 
-### Prerequisites
-
-- Go 1.21 or higher
-- Access to a running Agent Gateway API
-
-### Build
+### Quick Install
 
 ```bash
-cd /home/battlestag/Work/BATTLESTAG-BOT/APPS/battlestag-tui
-go mod tidy
-go build -o battlestag-tui
+./install.sh
+```
+
+This will:
+1. Build the `battlestag` binary
+2. Install to `~/.local/bin/battlestag`
+3. Create config directory at `~/.config/battlestag-tui/`
+4. Check if `~/.local/bin` is in your PATH
+
+### Manual Installation
+
+```bash
+# Build
+make build
+
+# Install
+make install
+
+# Or build manually
+go build -o battlestag .
+```
+
+### Uninstallation
+
+```bash
+./uninstall.sh
+```
+
+Or manually:
+```bash
+make uninstall
 ```
 
 ## Configuration
 
-The TUI uses environment variables for configuration:
+On first run, you'll be prompted to configure:
+- **Agent Gateway URL**: The API endpoint (default: `http://192.168.1.140:8080`)
+- **API Key**: Authentication key for the gateway
 
-```bash
-# Optional: API endpoint (default: http://192.168.1.140:8080)
-export AGENT_GATEWAY_URL="http://192.168.1.140:8080"
-
-# Optional: API authentication key (default: test-api-key-12345)
-export AGENT_GATEWAY_API_KEY="test-api-key-12345"
-```
-
-**Note**: The defaults are already configured for the BATTLESTAG server at 192.168.1.140. You can run without setting these variables.
+Configuration is saved to: `~/.config/battlestag-tui/config.yaml`
 
 ## Usage
 
-### Running the TUI
+### Starting the Application
 
 ```bash
-./battlestag-tui
+battlestag
 ```
+
+### Chat Interface
+
+The chat interface is the default view. Simply type your message and press Enter:
+
+```
+> What's my current net worth?
+> Show me my assets
+> How do I upload a bank statement?
+```
+
+The AI will respond and may suggest relevant commands.
+
+### Commands
+
+Type "/" followed by a command:
+
+```
+/dashboard     - View financial overview
+/assets        - List all assets
+/liabilities   - List all liabilities
+/upload        - Upload bank statement
+/settings      - Configure application
+```
+
+**Note**: Command palette is coming soon. For now, type the full command after "/"
 
 ### Keyboard Shortcuts
 
-#### Global Navigation
-- `1` - Dashboard
-- `2` - Assets
-- `3` - Liabilities
-- `4` - Upload
-- `?` - Help
-- `q` - Quit
-
-#### List Navigation
-- `↑/k` - Move up
-- `↓/j` - Move down
-- `r` - Refresh data
-- `d` - Delete selected item
-- `Esc` - Cancel/Go back
-
-#### File Upload
-- `Enter` - Submit file path
-- `Ctrl+U` - Clear input
-- `Backspace` - Delete character
-
-## Screens
-
-### Dashboard
-Displays:
-- Net worth and financial overview
-- Total assets and liabilities
-- Daily stoic thought
-- System health status
-
-### Assets
-- View all tracked assets
-- See current values and gains/losses
-- Delete assets
-- Summary totals
-
-### Liabilities
-- View all liabilities
-- Monitor balances and credit utilization
-- Delete liabilities
-- Summary totals
-
-### Upload
-- Upload PDF bank statements
-- Automatic processing and transaction extraction
+- **Enter** - Submit message/command
+- **/** - Start typing a command
+- **Ctrl+L** - Clear chat history
+- **Ctrl+C** or **Ctrl+D** - Quit application
+- **Esc** - Clear current input
 
 ## Development
 
@@ -100,19 +115,57 @@ Displays:
 
 ```
 battlestag-tui/
-├── main.go              # Application entry point
-├── client/
-│   └── api.go          # API client
-├── models/
-│   └── models.go       # Data structures
-├── ui/
-│   ├── app.go          # Main app model
-│   ├── dashboard.go    # Dashboard view
-│   ├── assets.go       # Assets view
-│   ├── liabilities.go  # Liabilities view
-│   ├── upload.go       # Upload view
-│   └── styles.go       # UI styling
-└── components/         # Reusable components (future)
+├── client/          # API client for Agent Gateway
+│   ├── api.go       # REST API methods
+│   └── llm.go       # LLM chat client
+├── config/          # Configuration management
+│   └── config.go
+├── models/          # Data models
+│   └── models.go
+├── ui/              # User interface components
+│   ├── app.go       # Main application logic
+│   ├── chat.go      # Chat conversation view
+│   ├── prompt.go    # Input prompt component
+│   ├── onboarding.go # First-run setup
+│   └── styles.go    # Shared styles
+├── main.go          # Entry point
+├── Makefile         # Build automation
+├── install.sh       # Installation script
+└── uninstall.sh     # Uninstallation script
+```
+
+### Building
+
+```bash
+# Build binary
+make build
+
+# Format code
+make fmt
+
+# Run tests
+make test
+
+# Vet code
+make vet
+
+# Run without installing
+make run
+```
+
+### Module Structure
+
+The project uses the simplified module name `battlestag`:
+
+```go
+module battlestag
+
+import (
+    "battlestag/client"
+    "battlestag/config"
+    "battlestag/models"
+    "battlestag/ui"
+)
 ```
 
 ### Dependencies
@@ -121,29 +174,68 @@ battlestag-tui/
 - [lipgloss](https://github.com/charmbracelet/lipgloss) - Styling
 - [bubbles](https://github.com/charmbracelet/bubbles) - TUI components
 
+## Requirements
+
+- Go 1.21 or higher (upgraded to 1.23 with latest dependencies)
+- Agent Gateway running and accessible
+- Ollama server with llama3.2:8b model (for AI chat)
+
 ## Troubleshooting
 
-### Connection Issues
+### Binary not found after installation
 
-If you see "Disconnected" status:
-1. Verify the Agent Gateway is running on 192.168.1.140:
-   ```bash
-   curl http://192.168.1.140:8080/api/health
-   ```
-2. Check `AGENT_GATEWAY_URL` is correct (should be http://192.168.1.140:8080)
-3. Verify `AGENT_GATEWAY_API_KEY` matches the server config (default: test-api-key-12345)
-4. Ensure network connectivity to 192.168.1.140
+Make sure `~/.local/bin` is in your PATH:
+
+```bash
+# For bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+
+# For zsh
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+### Can't connect to Agent Gateway
+
+1. Check if the gateway is running
+2. Verify the URL in settings during onboarding
+3. Test connection: `curl http://192.168.1.140:8080/api/health`
+
+### LLM not responding
+
+1. Check if Ollama server is running on 192.168.1.232
+2. Verify LLM endpoint in Agent Gateway config
+3. Test Ollama: `curl http://192.168.1.232:11434/api/tags`
 
 ### Build Errors
 
 ```bash
-# Clean module cache
-go clean -modcache
-
-# Re-download dependencies
+# Clean and rebuild
+make clean
 go mod tidy
-go mod download
+make build
 ```
+
+## Roadmap
+
+- [x] Phase 1: LLM Chat Integration
+- [x] Phase 2: Global Installation
+- [x] Phase 3: Claude Code-style Interface
+- [ ] Phase 4: Command Palette with Fuzzy Search
+- [ ] Phase 5: Command Execution (dashboard, assets, etc.)
+- [ ] Phase 6: Tab Autocomplete
+- [ ] Phase 7: Enhanced UI Polish
+
+## Migration from Old Version
+
+The new version has been completely rewritten with:
+- Removed tab-based navigation (no more numbered tabs 1-5)
+- Chat-first interface instead of dashboard
+- Unified input via prompt line
+- Command-driven instead of screen-based navigation
+
+Old keyboard shortcuts (1-5 for tabs) have been replaced with "/" commands.
 
 ## License
 

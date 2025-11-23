@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/battlestag/battlestag-tui/client"
-	"github.com/battlestag/battlestag-tui/models"
+	"battlestag/client"
+	"battlestag/models"
 )
 
 // AssetsModel represents the assets management screen

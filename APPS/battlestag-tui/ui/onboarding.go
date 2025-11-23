@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/battlestag/battlestag-tui/client"
-	"github.com/battlestag/battlestag-tui/config"
+	"battlestag/client"
+	"battlestag/config"
 )
 
 // OnboardingModel represents the onboarding screen state

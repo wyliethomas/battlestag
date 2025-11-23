@@ -5,9 +5,9 @@ import (
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/battlestag/battlestag-tui/client"
-	"github.com/battlestag/battlestag-tui/config"
-	"github.com/battlestag/battlestag-tui/ui"
+	"battlestag/client"
+	"battlestag/config"
+	"battlestag/ui"
 )
 
 func main() {

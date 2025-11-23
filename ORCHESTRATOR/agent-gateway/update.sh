@@ -68,27 +68,28 @@ sudo chmod +x "$INSTALL_DIR/$BINARY_NAME"
 echo "✓ Binary updated"
 echo
 
-# Check if config file needs updating
-if [ -f "config.yaml" ] && [ -f "$CONFIG_DIR/config.yaml" ]; then
-    # Compare configs (ignore comments and whitespace)
-    if ! diff -q <(grep -v '^#' config.yaml | grep -v '^[[:space:]]*$') \
-                  <(sudo cat $CONFIG_DIR/config.yaml | grep -v '^#' | grep -v '^[[:space:]]*$') > /dev/null 2>&1; then
-        echo "Config file has changed"
-        read -p "Update config file? (Will backup old one) [Y/n] " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+# Update config file
+if [ -f "config.yaml" ]; then
+    echo "Updating configuration file..."
+    read -p "Update config file? (Will backup old one) [Y/n] " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+        # Backup existing config
+        if [ -f "$CONFIG_DIR/config.yaml" ]; then
             CONFIG_BACKUP="config.yaml.backup.$(date +%Y%m%d_%H%M%S)"
             sudo cp "$CONFIG_DIR/config.yaml" "$CONFIG_DIR/$CONFIG_BACKUP"
-            sudo cp config.yaml "$CONFIG_DIR/config.yaml"
-            # Update paths for current user
-            sudo sed -i "s|/home/battlestag|$HOME|g" "$CONFIG_DIR/config.yaml"
-            echo "✓ Config updated (backup: $CONFIG_DIR/$CONFIG_BACKUP)"
-        else
-            echo "  Keeping existing config"
+            echo "  Backup created: $CONFIG_DIR/$CONFIG_BACKUP"
         fi
+        # Copy new config
+        sudo cp config.yaml "$CONFIG_DIR/config.yaml"
+        # Update paths for current user
+        sudo sed -i "s|/home/battlestag|$HOME|g" "$CONFIG_DIR/config.yaml"
+        echo "✓ Config updated"
     else
-        echo "✓ Config file unchanged"
+        echo "  Skipped config update"
     fi
+else
+    echo "⚠ No config.yaml found in current directory"
 fi
 
 echo

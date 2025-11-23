@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/battlestag/battlestag-tui/client"
+	"battlestag/client"
 )
 
 // UploadModel represents the PDF upload screen
