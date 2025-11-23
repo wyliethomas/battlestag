@@ -27,6 +27,14 @@ make build
 
 echo ""
 echo "Updating binary at $INSTALL_DIR/$BINARY_NAME..."
+
+# Check if binary is running
+if pgrep -x "$BINARY_NAME" > /dev/null; then
+    echo "⚠️  $BINARY_NAME is currently running"
+    echo "Please close it first, then run this script again"
+    exit 1
+fi
+
 cp $BINARY_NAME $INSTALL_DIR/
 chmod +x $INSTALL_DIR/$BINARY_NAME
 

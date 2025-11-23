@@ -31,7 +31,7 @@ func NewClient() *Client {
 
 	apiKey := os.Getenv("AGENT_GATEWAY_API_KEY")
 	if apiKey == "" {
-		apiKey = "test-api-key-12345" // Default matching server config at /etc/agent-gateway/config.yaml
+		apiKey = "your-secret-api-key-here" // Default matching server config at /etc/agent-gateway/config.yaml
 	}
 
 	return NewClientWithConfig(baseURL, apiKey)

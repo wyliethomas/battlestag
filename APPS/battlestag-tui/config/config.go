@@ -25,7 +25,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		AgentGateway: AgentGatewayConfig{
 			URL:    "http://192.168.1.140:8080",
-			APIKey: "test-api-key-12345",
+			APIKey: "your-secret-api-key-here",
 		},
 		Version: "1.0",
 	}
