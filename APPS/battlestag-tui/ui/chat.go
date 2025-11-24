@@ -16,6 +16,7 @@ type ChatMessage struct {
 	Content   string    // Message content
 	Timestamp time.Time // When the message was sent
 	Commands  []string  // Suggested commands (for assistant messages)
+	Source    string    // "llm" (shows as "Battlestag") or program name (e.g., "Echo Test")
 }
 
 // ChatModel represents the chat conversation view
@@ -48,13 +49,27 @@ func (m *ChatModel) AddUserMessage(content string) {
 	m.scrollOffset = 0
 }
 
-// AddAssistantMessage adds an assistant message to the conversation
+// AddAssistantMessage adds an assistant message from Battlestag (LLM)
 func (m *ChatModel) AddAssistantMessage(content string, commands []string) {
 	m.messages = append(m.messages, ChatMessage{
 		Role:      "assistant",
 		Content:   content,
 		Timestamp: time.Now(),
 		Commands:  commands,
+		Source:    "llm", // LLM responses show as "Battlestag"
+	})
+	// Auto-scroll to bottom when new message is added
+	m.scrollOffset = 0
+}
+
+// AddProgramMessage adds a message from a program execution
+func (m *ChatModel) AddProgramMessage(programName string, content string) {
+	m.messages = append(m.messages, ChatMessage{
+		Role:      "assistant",
+		Content:   content,
+		Timestamp: time.Now(),
+		Commands:  nil,
+		Source:    programName, // Program name shows as-is
 	})
 	// Auto-scroll to bottom when new message is added
 	m.scrollOffset = 0
@@ -66,6 +81,7 @@ func (m *ChatModel) AddErrorMessage(err error) {
 		Role:      "assistant",
 		Content:   fmt.Sprintf("Error: %v", err),
 		Timestamp: time.Now(),
+		Source:    "llm", // Errors show as from Battlestag
 	})
 	// Auto-scroll to bottom when new message is added
 	m.scrollOffset = 0
@@ -285,12 +301,20 @@ func (m *ChatModel) renderMessage(msg ChatMessage) string {
 	if msg.Role == "user" {
 		// User message - right aligned, blue
 		header := userHeaderStyle.Render(fmt.Sprintf("You • %s", timeStr))
-		body := userMessageStyle.Width(m.width - 10).Render(msg.Content)
+		body := userMessageStyle.Width(m.width - 2).Render(msg.Content)
 		content = lipgloss.JoinVertical(lipgloss.Right, header, body)
 	} else {
 		// Assistant message - left aligned, green
-		header := assistantHeaderStyle.Render(fmt.Sprintf("Assistant • %s", timeStr))
-		body := assistantMessageStyle.Width(m.width - 10).Render(msg.Content)
+		// Determine the sender name based on source
+		senderName := "Assistant" // Default fallback
+		if msg.Source == "llm" {
+			senderName = "Battlestag"
+		} else if msg.Source != "" {
+			senderName = msg.Source // Program name
+		}
+
+		header := assistantHeaderStyle.Render(fmt.Sprintf("%s • %s", senderName, timeStr))
+		body := assistantMessageStyle.Width(m.width - 2).Render(msg.Content)
 
 		content = lipgloss.JoinVertical(lipgloss.Left, header, body)
 	}
@@ -313,8 +337,7 @@ var (
 			Align(lipgloss.Right)
 
 	userMessageStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("15")). // White
-				Background(lipgloss.Color("24")). // Dark blue
+				Foreground(lipgloss.Color("15")). // Bright white (respects theme)
 				Padding(0, 1).
 				Align(lipgloss.Right)
 
@@ -324,8 +347,7 @@ var (
 				Bold(true)
 
 	assistantMessageStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("15")). // White
-				Background(lipgloss.Color("22")). // Dark green
+				Foreground(lipgloss.Color("15")). // Bright white (respects theme)
 				Padding(0, 1)
 
 	// Loading indicator style
@@ -335,12 +357,12 @@ var (
 
 	// Welcome message style
 	chatWelcomeStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("242")). // Gray
+				Foreground(lipgloss.Color("8")). // Bright black/grey (respects theme)
 				Padding(1, 2)
 
 	// Scroll indicator style
 	scrollIndicatorStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("242")). // Gray
+				Foreground(lipgloss.Color("8")). // Bright black/grey (respects theme)
 				Italic(true).
 				Align(lipgloss.Center)
 )

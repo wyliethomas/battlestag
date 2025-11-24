@@ -7,14 +7,14 @@ import (
 )
 
 var (
-	// Colors
-	colorPrimary   = lipgloss.Color("#7D56F4")
-	colorSuccess   = lipgloss.Color("#00FF00")
-	colorDanger    = lipgloss.Color("#FF0000")
-	colorWarning   = lipgloss.Color("#FFA500")
-	colorMuted     = lipgloss.Color("#666666")
-	colorBorder    = lipgloss.Color("#383838")
-	colorHighlight = lipgloss.Color("#FFD700")
+	// Colors - Using ANSI colors to respect terminal theme
+	colorPrimary   = lipgloss.Color("6")   // Cyan - for primary highlights
+	colorSuccess   = lipgloss.Color("2")   // Green - for success/positive
+	colorDanger    = lipgloss.Color("1")   // Red - for errors/danger
+	colorWarning   = lipgloss.Color("3")   // Yellow - for warnings
+	colorMuted     = lipgloss.Color("8")   // Bright black/grey - for muted text
+	colorBorder    = lipgloss.Color("8")   // Bright black/grey - for borders
+	colorHighlight = lipgloss.Color("11")  // Bright yellow - for highlights
 
 	// Base styles
 	baseStyle = lipgloss.NewStyle().

@@ -129,6 +129,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return m, nil
 
+	case ProgramResponseMsg:
+		// Received program execution output
+		m.chat.AddProgramMessage(msg.programName, msg.output)
+		m.statusMsg = ""
+		return m, nil
+
 	case ShowCommandPaletteMsg:
 		// Show command palette
 		m.palette.Show(msg.filter)
@@ -334,18 +340,45 @@ func (m Model) renderFooter() string {
 	var help string
 
 	if m.waitingForLLM {
-		help = helpStyle.Render("Waiting for response...")
+		help = "Waiting for response..."
 	} else {
-		help = helpStyle.Render("[/] Commands • [↑↓] Scroll • [Ctrl+L] Clear • [Ctrl+C] Quit")
+		help = "[/] Commands • [↑↓] Scroll • [Ctrl+L] Clear • [Ctrl+C] Quit"
 	}
 
-	var statusLine string
+	// Pad the help text to fill the width
+	// Account for border and padding characters
+	availableWidth := m.width
+	helpLength := lipgloss.Width(help)
+
+	// Add spacing to fill the line
+	if helpLength < availableWidth {
+		help = help + strings.Repeat(" ", availableWidth-helpLength)
+	}
+
+	// Build footer content
+	var parts []string
 	if m.statusMsg != "" {
-		statusLine = infoStyle.Render(m.statusMsg)
+		statusLength := lipgloss.Width(m.statusMsg)
+		paddedStatus := m.statusMsg
+		if statusLength < availableWidth {
+			paddedStatus = paddedStatus + strings.Repeat(" ", availableWidth-statusLength)
+		}
+		parts = append(parts, paddedStatus)
 	}
+	parts = append(parts, help)
 
-	footer := lipgloss.JoinVertical(lipgloss.Left, statusLine, help)
-	return footerStyle.Width(m.width).Render(footer)
+	content := strings.Join(parts, "\n")
+
+	// Apply styling to the entire footer
+	styledFooter := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("8")). // Bright black/grey (respects theme)
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderTop(true).
+		BorderForeground(lipgloss.Color("8")). // Bright black/grey (respects theme)
+		Padding(1, 0).
+		Render(content)
+
+	return styledFooter
 }
 
 // sendChatMessage sends a message to the LLM API
@@ -372,6 +405,22 @@ func (m *Model) sendChatMessage(message string) tea.Cmd {
 // executeProgramCmd executes a program and displays the result
 func (m *Model) executeProgramCmd(programID string, params map[string]interface{}) tea.Cmd {
 	return func() tea.Msg {
+		// First, get program info to get the display name
+		programs, err := m.client.ListPrograms()
+		if err != nil {
+			return ErrorMsg{err: fmt.Errorf("failed to get program info: %w", err)}
+		}
+
+		// Find the program name
+		programName := programID // Fallback to ID
+		for _, prog := range programs {
+			if prog.ID == programID {
+				programName = prog.Name
+				break
+			}
+		}
+
+		// Execute the program
 		result, err := m.client.ExecuteProgram(programID, params)
 		if err != nil {
 			return ErrorMsg{err: err}
@@ -384,10 +433,10 @@ func (m *Model) executeProgramCmd(programID string, params map[string]interface{
 			}
 		}
 
-		// Return program output as assistant message
-		return ChatResponseMsg{
-			message:           result.Output,
-			suggestedCommands: nil,
+		// Return program output with program name
+		return ProgramResponseMsg{
+			programName: programName,
+			output:      result.Output,
 		}
 	}
 }
@@ -624,6 +673,12 @@ type ChatResponseMsg struct {
 	programParams     map[string]interface{}
 }
 
+// ProgramResponseMsg contains program execution output
+type ProgramResponseMsg struct {
+	programName string
+	output      string
+}
+
 // ErrorMsg represents an error message
 type ErrorMsg struct {
 	err error
@@ -640,6 +695,5 @@ var (
 	footerStyle = lipgloss.NewStyle().
 			BorderStyle(lipgloss.NormalBorder()).
 			BorderTop(true).
-			BorderForeground(lipgloss.Color("240")).
-			Padding(0, 1)
+			BorderForeground(lipgloss.Color("240"))
 )

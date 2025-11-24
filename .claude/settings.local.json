@@ -9,7 +9,21 @@
       "Bash(./financial-document-watcher:*)",
       "Bash(find:*)",
       "Bash(make help:*)",
-      "Bash(make build:*)"
+      "Bash(make build:*)",
+      "Bash(chmod:*)",
+      "Bash(export DB_PATH=/tmp/test-tasks.db:*)",
+      "Bash(./task_journal add:*)",
+      "Bash(./task_checklist check:*)",
+      "Bash(./task_checklist list:*)",
+      "Bash(./task_query status:*)",
+      "Bash(./task_query suggest:*)",
+      "Bash(./task_query overview:*)",
+      "Bash(./task_project list:*)",
+      "Bash(./task_journal list:*)",
+      "Bash(./task_journal latest:*)",
+      "Bash(./task_project update:*)",
+      "Bash(./task_query closing:*)",
+      "Bash(./task_query context:*)"
     ],
     "deny": [],
     "ask": []
