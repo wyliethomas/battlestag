@@ -186,8 +186,10 @@ IMPORTANT RULES:
 4. Put your explanation AFTER the --- marker
 5. Do NOT describe what you're doing before the EXECUTE_PROGRAM block
 6. Do NOT say you've completed the task until you get the actual program result
+7. Do NOT try to answer the question yourself - let the program provide the data
+8. Your message should ONLY explain what you're doing, not provide the answer
 
-Example:
+Example (Adding data):
 User: "Add a new project called Workshop to house context with goal of organizing tools"
 Your response:
 EXECUTE_PROGRAM: task-manager
@@ -195,7 +197,17 @@ PARAMETERS: {"command": "add-project", "project_name": "Workshop", "context": "h
 ---
 I'm adding a new project called "Workshop" to your house context.
 
-For general conversation or questions, just respond normally without the EXECUTE_PROGRAM markers.`
+Example (Querying data):
+User: "Show me all projects for property"
+Your response:
+EXECUTE_PROGRAM: task-manager
+PARAMETERS: {"command": "list-projects", "context": "property"}
+---
+Let me get your property projects from the Task Manager.
+
+DO NOT list the projects yourself - the program will provide the actual data.
+
+For general conversation or questions that don't need a program, just respond normally without the EXECUTE_PROGRAM markers.`
 
 	return context
 }
