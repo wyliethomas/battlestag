@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
@@ -68,11 +69,24 @@ func (h *ProgramsHandler) ExecuteProgram(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Log program execution for debugging
+	paramsJSON, _ := json.Marshal(request.Parameters)
+	log.Printf("[PROGRAM] Executing: %s with params: %s", request.ProgramID, string(paramsJSON))
+
 	// Execute program with timeout
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 
 	result, err := h.registry.Execute(ctx, request.ProgramID, request.Parameters)
+
+	// Log result
+	if err != nil {
+		log.Printf("[PROGRAM] Error executing %s: %v", request.ProgramID, err)
+	} else if !result.Success {
+		log.Printf("[PROGRAM] Failed %s: %s", request.ProgramID, result.Error)
+	} else {
+		log.Printf("[PROGRAM] Success %s", request.ProgramID)
+	}
 	if err != nil {
 		response := models.Response{
 			Success: false,

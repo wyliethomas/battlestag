@@ -81,6 +81,13 @@ func (h *LLMHandler) Chat(w http.ResponseWriter, r *http.Request) {
 	// Parse response for program invocation
 	programID, programParams, cleanMessage := h.parseProgramInvocation(response)
 
+	// Log if program was detected
+	if programID != "" {
+		paramsJSON, _ := json.Marshal(programParams)
+		fmt.Printf("[LLM] Detected program: %s with params: %s\n", programID, string(paramsJSON))
+		fmt.Printf("[LLM] Clean message: %s\n", cleanMessage)
+	}
+
 	// Extract suggested commands from response
 	suggestedCommands := extractCommands(cleanMessage)
 
@@ -165,22 +172,30 @@ func (h *LLMHandler) buildProgramsContext() string {
 		context += "\n"
 	}
 
-	context += `When a user's request matches a program's capability, you can suggest running that program by including a special marker in your response:
+	context += `When a user's request matches a program's capability, you MUST use this EXACT format to execute it:
 
 EXECUTE_PROGRAM: program_id
 PARAMETERS: {"param1": "value1", "param2": "value2"}
 ---
+Your natural language explanation here
 
-After the --- marker, provide a natural language response to the user explaining what you're doing.
+IMPORTANT RULES:
+1. Use ONLY ONE EXECUTE_PROGRAM block per response
+2. ALL required parameters MUST be included in the PARAMETERS line
+3. The PARAMETERS must be valid JSON on a SINGLE line
+4. Put your explanation AFTER the --- marker
+5. Do NOT describe what you're doing before the EXECUTE_PROGRAM block
+6. Do NOT say you've completed the task until you get the actual program result
 
 Example:
-User: "Echo hello world 3 times"
-You: EXECUTE_PROGRAM: echo
-PARAMETERS: {"message": "hello world", "repeat": 3}
+User: "Add a new project called Workshop to house context with goal of organizing tools"
+Your response:
+EXECUTE_PROGRAM: task-manager
+PARAMETERS: {"command": "add-project", "project_name": "Workshop", "context": "house", "goal": "organizing tools"}
 ---
-I'll echo "hello world" 3 times for you.
+I'm adding a new project called "Workshop" to your house context.
 
-Only use this when the user's request clearly matches a program's purpose. For general conversation, just respond normally.`
+For general conversation or questions, just respond normally without the EXECUTE_PROGRAM markers.`
 
 	return context
 }

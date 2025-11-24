@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -37,6 +38,7 @@ type Model struct {
 
 	// State
 	waitingForLLM bool
+	connected     bool // Current connection status
 }
 
 // NewModel creates a new application model
@@ -57,6 +59,7 @@ func NewModel(apiClient *client.Client, cfg *config.Config, showOnboarding bool)
 		chat:       NewChatModel(apiClient),
 		prompt:     NewPromptModel(),
 		palette:    NewPaletteModel(),
+		connected:  true, // Start optimistic
 	}
 }
 
@@ -65,6 +68,7 @@ func (m Model) Init() tea.Cmd {
 	return tea.Batch(
 		m.prompt.Init(),
 		tea.EnterAltScreen,
+		doConnectionCheck(m.client), // Initial connection check
 	)
 }
 
@@ -254,6 +258,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.chat.SetLoading(false)
 		m.chat.AddErrorMessage(msg.err)
 		return m, nil
+
+	case ConnectionCheckMsg:
+		// Update connection status
+		m.connected = msg.connected
+		// Schedule next check in 10 seconds
+		return m, tea.Tick(10*time.Second, func(t time.Time) tea.Msg {
+			return doConnectionCheck(m.client)()
+		})
 	}
 
 	// Route updates based on current mode
@@ -314,7 +326,7 @@ func (m Model) renderHeader() string {
 	// Connection status
 	status := "Connected"
 	statusStyle := statusConnected
-	if m.err != nil {
+	if !m.connected {
 		status = "Not Connected"
 		statusStyle = statusDisconnected
 	}
@@ -427,9 +439,10 @@ func (m *Model) executeProgramCmd(programID string, params map[string]interface{
 		}
 
 		if !result.Success {
-			return ChatResponseMsg{
-				message:           fmt.Sprintf("Program execution failed: %s", result.Error),
-				suggestedCommands: nil,
+			// Return as program error, not as assistant message
+			return ProgramResponseMsg{
+				programName: programName + " (Error)",
+				output:      fmt.Sprintf("❌ Program execution failed: %s", result.Error),
 			}
 		}
 
@@ -663,6 +676,17 @@ func max(a, b int) int {
 	return b
 }
 
+// doConnectionCheck performs a lightweight health check on the API
+func doConnectionCheck(c *client.Client) tea.Cmd {
+	return func() tea.Msg {
+		// Try to list programs as a lightweight health check
+		_, err := c.ListPrograms()
+		return ConnectionCheckMsg{
+			connected: err == nil,
+		}
+	}
+}
+
 // Custom messages
 
 // ChatResponseMsg contains the LLM response
@@ -687,6 +711,11 @@ type ErrorMsg struct {
 // StatusMsg represents a status message
 type StatusMsg struct {
 	message string
+}
+
+// ConnectionCheckMsg represents the result of a connection health check
+type ConnectionCheckMsg struct {
+	connected bool
 }
 
 // Styles specific to app.go (non-duplicates)
