@@ -132,7 +132,7 @@ func (p *TaskManagerProgram) Execute(ctx context.Context, params map[string]inte
 		cmd = exec.CommandContext(ctx, "task_project_run", "contexts", "--list")
 
 	case "add-context":
-		contextName := getStringParam(params, "context")
+		contextName := strings.ToLower(getStringParam(params, "context"))
 		if contextName == "" {
 			return &ExecutionResult{Success: false, Error: "context parameter required for add-context"}, fmt.Errorf("missing context")
 		}
@@ -140,7 +140,7 @@ func (p *TaskManagerProgram) Execute(ctx context.Context, params map[string]inte
 
 	// Project commands
 	case "add-project":
-		contextName := getStringParam(params, "context")
+		contextName := strings.ToLower(getStringParam(params, "context"))
 		projectName := getStringParam(params, "project_name")
 		if contextName == "" || projectName == "" {
 			return &ExecutionResult{Success: false, Error: "context and project_name required for add-project"}, fmt.Errorf("missing parameters")
@@ -153,7 +153,7 @@ func (p *TaskManagerProgram) Execute(ctx context.Context, params map[string]inte
 
 	case "list-projects":
 		cmdArgs = []string{"list"}
-		if contextName := getStringParam(params, "context"); contextName != "" {
+		if contextName := strings.ToLower(getStringParam(params, "context")); contextName != "" {
 			cmdArgs = append(cmdArgs, "--context", contextName)
 		}
 		if status := getStringParam(params, "status"); status != "" {
@@ -254,14 +254,14 @@ func (p *TaskManagerProgram) Execute(ctx context.Context, params map[string]inte
 
 	case "query-overview":
 		cmdArgs = []string{"overview"}
-		if contextName := getStringParam(params, "context"); contextName != "" {
+		if contextName := strings.ToLower(getStringParam(params, "context")); contextName != "" {
 			cmdArgs = append(cmdArgs, "--context", contextName)
 		}
 		cmd = exec.CommandContext(ctx, "task_query_run", cmdArgs...)
 
 	case "query-suggest":
 		cmdArgs = []string{"suggest"}
-		if contextName := getStringParam(params, "context"); contextName != "" {
+		if contextName := strings.ToLower(getStringParam(params, "context")); contextName != "" {
 			cmdArgs = append(cmdArgs, "--context", contextName)
 		}
 		if timeAvailable := getStringParam(params, "time_available"); timeAvailable != "" {
@@ -284,7 +284,7 @@ func (p *TaskManagerProgram) Execute(ctx context.Context, params map[string]inte
 		cmd = exec.CommandContext(ctx, "task_query_run", "closing", "--threshold", fmt.Sprintf("%d", threshold))
 
 	case "query-context":
-		contextName := getStringParam(params, "context")
+		contextName := strings.ToLower(getStringParam(params, "context"))
 		if contextName == "" {
 			return &ExecutionResult{Success: false, Error: "context required for query-context"}, fmt.Errorf("missing context")
 		}
