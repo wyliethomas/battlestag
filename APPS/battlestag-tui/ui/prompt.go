@@ -45,16 +45,43 @@ func (m PromptModel) Update(msg tea.Msg) (PromptModel, tea.Cmd) {
 		m.textInput.Width = msg.Width - 10
 		return m, nil
 
+	case PaletteFilterUpdateMsg:
+		// Update input value from palette navigation
+		m.textInput.SetValue(msg.filter)
+		m.textInput.CursorEnd()
+		return m, nil
+
 	case tea.KeyMsg:
-		// Detect "/" to show command palette
-		if msg.Type == tea.KeyRunes && len(msg.Runes) == 1 && msg.Runes[0] == '/' {
-			// If input is empty and user types "/", show command palette
-			if m.textInput.Value() == "" {
-				m.showingCommands = true
-				return m, func() tea.Msg {
-					return ShowCommandPaletteMsg{}
-				}
+		// Don't process keys if palette is open - let app handle it
+		// Except for text input which should update the filter
+		if m.showingCommands {
+			// Allow typing to continue filtering
+			if msg.Type == tea.KeyRunes {
+				// Update textinput
+				m.textInput, cmd = m.textInput.Update(msg)
+				// Send filter update
+				return m, tea.Batch(cmd, func() tea.Msg {
+					return PromptFilterUpdateMsg{filter: m.textInput.Value()}
+				})
 			}
+			// Allow backspace to update filter
+			if msg.Type == tea.KeyBackspace || msg.String() == "backspace" {
+				m.textInput, cmd = m.textInput.Update(msg)
+				newValue := m.textInput.Value()
+				// If we deleted the "/", close palette
+				if !strings.HasPrefix(newValue, "/") {
+					m.showingCommands = false
+					return m, tea.Batch(cmd, func() tea.Msg {
+						return PaletteCloseMsg{}
+					})
+				}
+				// Otherwise update filter
+				return m, tea.Batch(cmd, func() tea.Msg {
+					return PromptFilterUpdateMsg{filter: newValue}
+				})
+			}
+			// Don't handle other keys when palette is open
+			return m, nil
 		}
 
 		// Handle enter key - submit message
@@ -63,11 +90,12 @@ func (m PromptModel) Update(msg tea.Msg) (PromptModel, tea.Cmd) {
 			if value != "" {
 				// Check if it's a command (starts with /)
 				if strings.HasPrefix(value, "/") {
-					// It's a command
+					// It's a command - execute directly
 					cmd := strings.TrimPrefix(value, "/")
 					m.textInput.SetValue("")
+					m.showingCommands = false
 					return m, func() tea.Msg {
-						return CommandSubmitMsg{command: cmd}
+						return CommandExecuteMsg{command: cmd}
 					}
 				} else {
 					// It's a chat message
@@ -86,9 +114,23 @@ func (m PromptModel) Update(msg tea.Msg) (PromptModel, tea.Cmd) {
 			m.showingCommands = false
 			return m, nil
 		}
+
+		// Detect "/" to show command palette
+		if msg.Type == tea.KeyRunes && len(msg.Runes) == 1 && msg.Runes[0] == '/' {
+			// If input is empty and user types "/", show command palette
+			if m.textInput.Value() == "" {
+				m.showingCommands = true
+				// First update the textinput to show "/"
+				m.textInput, cmd = m.textInput.Update(msg)
+				// Then show palette
+				return m, tea.Batch(cmd, func() tea.Msg {
+					return ShowCommandPaletteMsg{filter: "/"}
+				})
+			}
+		}
 	}
 
-	// Update the textinput
+	// Update the textinput for normal typing
 	m.textInput, cmd = m.textInput.Update(msg)
 
 	return m, cmd
@@ -132,11 +174,13 @@ func (m *PromptModel) Value() string {
 // Custom messages
 
 // ShowCommandPaletteMsg indicates command palette should be shown
-type ShowCommandPaletteMsg struct{}
+type ShowCommandPaletteMsg struct {
+	filter string // Initial filter
+}
 
-// CommandSubmitMsg indicates a command was submitted
-type CommandSubmitMsg struct {
-	command string
+// PromptFilterUpdateMsg indicates the prompt filter has changed (for palette)
+type PromptFilterUpdateMsg struct {
+	filter string
 }
 
 // ChatSubmitMsg indicates a chat message was submitted

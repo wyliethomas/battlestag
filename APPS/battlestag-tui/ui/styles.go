@@ -23,7 +23,7 @@ var (
 	// Header styles
 	headerStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(colorPrimary).
+			Foreground(lipgloss.Color("#FFFFFF")).
 			Padding(0, 1)
 
 	titleStyle = lipgloss.NewStyle().
@@ -34,9 +34,10 @@ var (
 
 	// Status styles
 	statusBarStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFFFFF")).
-			Background(colorPrimary).
-			Padding(0, 1)
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderBottom(true).
+			BorderForeground(colorBorder).
+			Padding(1, 1)
 
 	statusConnected = lipgloss.NewStyle().
 			Foreground(colorSuccess).

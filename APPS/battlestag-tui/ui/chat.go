@@ -20,12 +20,13 @@ type ChatMessage struct {
 
 // ChatModel represents the chat conversation view
 type ChatModel struct {
-	messages    []ChatMessage
-	width       int
-	height      int
-	loading     bool
-	err         error
-	apiClient   *client.Client
+	messages     []ChatMessage
+	width        int
+	height       int
+	loading      bool
+	err          error
+	apiClient    *client.Client
+	scrollOffset int // Scroll position (lines from bottom)
 }
 
 // NewChatModel creates a new chat model
@@ -43,6 +44,8 @@ func (m *ChatModel) AddUserMessage(content string) {
 		Content:   content,
 		Timestamp: time.Now(),
 	})
+	// Auto-scroll to bottom when new message is added
+	m.scrollOffset = 0
 }
 
 // AddAssistantMessage adds an assistant message to the conversation
@@ -53,6 +56,8 @@ func (m *ChatModel) AddAssistantMessage(content string, commands []string) {
 		Timestamp: time.Now(),
 		Commands:  commands,
 	})
+	// Auto-scroll to bottom when new message is added
+	m.scrollOffset = 0
 }
 
 // AddErrorMessage adds an error message to the conversation
@@ -62,6 +67,8 @@ func (m *ChatModel) AddErrorMessage(err error) {
 		Content:   fmt.Sprintf("Error: %v", err),
 		Timestamp: time.Now(),
 	})
+	// Auto-scroll to bottom when new message is added
+	m.scrollOffset = 0
 }
 
 // SetLoading sets the loading state
@@ -96,6 +103,53 @@ func (m *ChatModel) GetHistory() []client.ChatHistory {
 func (m *ChatModel) Clear() {
 	m.messages = []ChatMessage{}
 	m.err = nil
+	m.scrollOffset = 0
+}
+
+// ScrollUp scrolls the chat view up
+func (m *ChatModel) ScrollUp(lines int) {
+	m.scrollOffset += lines
+	// Cap at reasonable maximum based on content
+	maxScroll := m.calculateMaxScroll()
+	if m.scrollOffset > maxScroll {
+		m.scrollOffset = maxScroll
+	}
+}
+
+// ScrollDown scrolls the chat view down
+func (m *ChatModel) ScrollDown(lines int) {
+	m.scrollOffset -= lines
+	if m.scrollOffset < 0 {
+		m.scrollOffset = 0
+	}
+}
+
+// ScrollToBottom scrolls to the bottom of the chat
+func (m *ChatModel) ScrollToBottom() {
+	m.scrollOffset = 0
+}
+
+// calculateMaxScroll calculates the maximum scroll offset based on content
+func (m *ChatModel) calculateMaxScroll() int {
+	// Count total lines in all messages
+	totalLines := 0
+	for _, msg := range m.messages {
+		// Each message has header (1 line) + content lines + spacing
+		contentLines := len(strings.Split(msg.Content, "\n"))
+		totalLines += 1 + contentLines + 1 // header + content + spacing
+
+		// Add command suggestions if present
+		if len(msg.Commands) > 0 {
+			totalLines += 1
+		}
+	}
+
+	// Max scroll is total lines minus viewport height
+	maxScroll := totalLines - m.height
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+	return maxScroll
 }
 
 // View renders the chat conversation
@@ -119,27 +173,63 @@ func (m *ChatModel) View() string {
 	// Join all messages
 	content := lipgloss.JoinVertical(lipgloss.Left, renderedMessages...)
 
+	// Apply viewport limiting based on height
+	content = m.applyViewport(content)
+
 	return content
+}
+
+// applyViewport limits content to viewport height and handles scrolling
+func (m *ChatModel) applyViewport(content string) string {
+	if m.height <= 0 {
+		return content
+	}
+
+	lines := strings.Split(content, "\n")
+	totalLines := len(lines)
+
+	// If content fits in viewport, show it all
+	if totalLines <= m.height {
+		return content
+	}
+
+	// Calculate visible range with scroll offset
+	endIdx := totalLines - m.scrollOffset
+	startIdx := endIdx - m.height
+	if startIdx < 0 {
+		startIdx = 0
+	}
+	if endIdx > totalLines {
+		endIdx = totalLines
+	}
+
+	// Extract visible lines
+	visibleLines := lines[startIdx:endIdx]
+
+	// Add scroll indicators
+	var result []string
+
+	// Top indicator if scrolled up
+	if startIdx > 0 {
+		result = append(result, scrollIndicatorStyle.Render("▲ Scrolled up - more messages above"))
+	}
+
+	result = append(result, visibleLines...)
+
+	// Bottom indicator if not at bottom
+	if endIdx < totalLines {
+		result = append(result, scrollIndicatorStyle.Render("▼ More messages below - scroll down"))
+	}
+
+	return strings.Join(result, "\n")
 }
 
 // renderWelcome renders the welcome message
 func (m *ChatModel) renderWelcome() string {
 	welcome := `
-Welcome to Battlestag!
-
-I'm your AI assistant for managing personal finances.
-
-You can:
-  • Ask me questions about your finances
-  • Type "/" to see available commands
-  • Get help with managing assets and liabilities
-
-Try asking me something like:
-  • "What's my current net worth?"
-  • "Show me my assets"
-  • "How do I upload a bank statement?"
-
-Type a message below to get started!
+░█▀▄░█▀█░▀█▀░▀█▀░█░░░█▀▀░█▀▀░▀█▀░█▀█░█▀▀
+░█▀▄░█▀█░░█░░░█░░█░░░█▀▀░▀▀█░░█░░█▀█░█░█
+░▀▀░░▀░▀░░▀░░░▀░░▀▀▀░▀▀▀░▀▀▀░░▀░░▀░▀░▀▀▀
 `
 	return chatWelcomeStyle.Render(welcome)
 }
@@ -226,4 +316,10 @@ var (
 	chatWelcomeStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("242")). // Gray
 				Padding(1, 2)
+
+	// Scroll indicator style
+	scrollIndicatorStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("242")). // Gray
+				Italic(true).
+				Align(lipgloss.Center)
 )
