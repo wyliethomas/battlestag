@@ -76,9 +76,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		// Update chat view size (leave room for header and prompt)
-		m.chat.SetSize(msg.Width, msg.Height-10)
-		// Update palette width
+
+		// Calculate chat viewport height more precisely
+		// Count actual lines used by fixed elements:
+		// - Header: 3 lines (padding top, content, padding bottom+border)
+		// - Footer: 4 lines (status line if present, help text, padding, border)
+		// - Prompt: 3 lines (border, content with padding, bottom)
+		// Total: ~10 lines for UI chrome
+		reservedLines := 10
+
+		if m.palette.IsVisible() {
+			reservedLines += 12 // Additional space for palette
+		}
+
+		chatViewportHeight := msg.Height - reservedLines
+		if chatViewportHeight < 5 {
+			chatViewportHeight = 5 // Minimum viewport
+		}
+
+		m.chat.SetSize(msg.Width, chatViewportHeight)
 		m.palette.SetWidth(msg.Width)
 		return m, nil
 
@@ -109,11 +125,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ShowCommandPaletteMsg:
 		// Show command palette
 		m.palette.Show(msg.filter)
+		// Recalculate chat viewport when palette opens
+		chatHeight := m.height - 10 - 12 // UI chrome + palette
+		if chatHeight < 5 {
+			chatHeight = 5
+		}
+		m.chat.SetSize(m.width, chatHeight)
 		return m, nil
 
 	case PaletteCloseMsg:
 		// Close command palette
 		m.palette.Hide()
+		// Recalculate chat viewport when palette closes
+		chatHeight := m.height - 10 // Just UI chrome (header, footer, prompt)
+		if chatHeight < 5 {
+			chatHeight = 5
+		}
+		m.chat.SetSize(m.width, chatHeight)
 		return m, nil
 
 	case PromptFilterUpdateMsg:
@@ -290,13 +318,8 @@ func (m Model) renderHeader() string {
 // renderChatArea renders the main chat conversation area
 func (m Model) renderChatArea() string {
 	// Chat model handles its own viewport and scrolling
-	chatView := m.chat.View()
-
-	// Just add padding, no height constraints here
-	return lipgloss.NewStyle().
-		Width(m.width).
-		Padding(1, 2).
-		Render(chatView)
+	// Return directly without extra padding/styling to maintain exact height
+	return m.chat.View()
 }
 
 // renderFooter renders the application footer with help text
@@ -444,7 +467,7 @@ Liabilities: $%.2f (%d items)
 			overview.TotalLiabilities, overview.LiabilityCount,
 		)
 
-		return ChatResponseMsg{message: message, suggestedCommands: []string{"/finance:assets", "/finance:liabilities"}}
+		return ChatResponseMsg{message: message, suggestedCommands: nil}
 	}
 }
 
@@ -468,7 +491,7 @@ func (m *Model) fetchAssets() tea.Cmd {
 			}
 		}
 
-		return ChatResponseMsg{message: message, suggestedCommands: []string{"/finance:dashboard"}}
+		return ChatResponseMsg{message: message, suggestedCommands: nil}
 	}
 }
 
@@ -493,7 +516,7 @@ func (m *Model) fetchLiabilities() tea.Cmd {
 			message += "\n"
 		}
 
-		return ChatResponseMsg{message: message, suggestedCommands: []string{"/finance:dashboard"}}
+		return ChatResponseMsg{message: message, suggestedCommands: nil}
 	}
 }
 

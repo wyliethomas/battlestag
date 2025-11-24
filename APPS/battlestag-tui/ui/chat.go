@@ -131,20 +131,22 @@ func (m *ChatModel) ScrollToBottom() {
 
 // calculateMaxScroll calculates the maximum scroll offset based on content
 func (m *ChatModel) calculateMaxScroll() int {
-	// Count total lines in all messages
-	totalLines := 0
+	// Render all messages to get accurate line count
+	var renderedMessages []string
 	for _, msg := range m.messages {
-		// Each message has header (1 line) + content lines + spacing
-		contentLines := len(strings.Split(msg.Content, "\n"))
-		totalLines += 1 + contentLines + 1 // header + content + spacing
-
-		// Add command suggestions if present
-		if len(msg.Commands) > 0 {
-			totalLines += 1
-		}
+		renderedMessages = append(renderedMessages, m.renderMessage(msg))
+	}
+	if m.loading {
+		renderedMessages = append(renderedMessages, m.renderLoading())
 	}
 
+	// Join and count actual lines
+	content := lipgloss.JoinVertical(lipgloss.Left, renderedMessages...)
+	lines := strings.Split(content, "\n")
+	totalLines := len(lines)
+
 	// Max scroll is total lines minus viewport height
+	// This allows scrolling to the very top of all content
 	maxScroll := totalLines - m.height
 	if maxScroll < 0 {
 		maxScroll = 0
@@ -193,35 +195,74 @@ func (m *ChatModel) applyViewport(content string) string {
 		return content
 	}
 
+	// Calculate how many lines we need for indicators
+	var result []string
+	availableLines := m.height
+
+	// Check if we need scroll indicators
+	showTopIndicator := m.scrollOffset > 0
+	showBottomIndicator := false
+
 	// Calculate visible range with scroll offset
+	// scrollOffset = 0 means bottom (most recent), higher values scroll up
 	endIdx := totalLines - m.scrollOffset
-	startIdx := endIdx - m.height
+	startIdx := endIdx - availableLines
+
+	// Adjust for bounds
 	if startIdx < 0 {
 		startIdx = 0
+		endIdx = startIdx + availableLines
+		showTopIndicator = false // At the very top
 	}
 	if endIdx > totalLines {
 		endIdx = totalLines
+		startIdx = endIdx - availableLines
+		if startIdx < 0 {
+			startIdx = 0
+		}
 	}
 
-	// Extract visible lines
-	visibleLines := lines[startIdx:endIdx]
+	// Check if there's more content below our viewport
+	showBottomIndicator = (endIdx < totalLines)
 
-	// Add scroll indicators
-	var result []string
+	// Reserve space for indicators
+	contentLines := availableLines
+	if showTopIndicator {
+		contentLines--
+	}
+	if showBottomIndicator {
+		contentLines--
+	}
 
-	// Top indicator if scrolled up
-	if startIdx > 0 {
-		result = append(result, scrollIndicatorStyle.Render("▲ Scrolled up - more messages above"))
+	// Now extract exactly contentLines from our range
+	actualStartIdx := endIdx - contentLines
+	if actualStartIdx < 0 {
+		actualStartIdx = 0
+	}
+
+	visibleLines := lines[actualStartIdx:endIdx]
+
+	// Build result with exactly m.height total lines
+	if showTopIndicator {
+		result = append(result, scrollIndicatorStyle.Render("▲ More above"))
 	}
 
 	result = append(result, visibleLines...)
 
-	// Bottom indicator if not at bottom
-	if endIdx < totalLines {
-		result = append(result, scrollIndicatorStyle.Render("▼ More messages below - scroll down"))
+	if showBottomIndicator {
+		result = append(result, scrollIndicatorStyle.Render("▼ More below"))
 	}
 
-	return strings.Join(result, "\n")
+	// Safety check: ensure we never exceed m.height
+	output := strings.Join(result, "\n")
+	outputLines := strings.Split(output, "\n")
+	if len(outputLines) > m.height {
+		// Trim to exact height
+		outputLines = outputLines[len(outputLines)-m.height:]
+		output = strings.Join(outputLines, "\n")
+	}
+
+	return output
 }
 
 // renderWelcome renders the welcome message
@@ -251,18 +292,7 @@ func (m *ChatModel) renderMessage(msg ChatMessage) string {
 		header := assistantHeaderStyle.Render(fmt.Sprintf("Assistant • %s", timeStr))
 		body := assistantMessageStyle.Width(m.width - 10).Render(msg.Content)
 
-		// Add suggested commands if available
-		var commandsSection string
-		if len(msg.Commands) > 0 {
-			commandsList := make([]string, len(msg.Commands))
-			for i, cmd := range msg.Commands {
-				commandsList[i] = suggestedCommandStyle.Render(cmd)
-			}
-			commandsText := "Suggested: " + strings.Join(commandsList, " ")
-			commandsSection = "\n" + commandsHintStyle.Render(commandsText)
-		}
-
-		content = lipgloss.JoinVertical(lipgloss.Left, header, body, commandsSection)
+		content = lipgloss.JoinVertical(lipgloss.Left, header, body)
 	}
 
 	// Add spacing between messages
@@ -297,15 +327,6 @@ var (
 				Foreground(lipgloss.Color("15")). // White
 				Background(lipgloss.Color("22")). // Dark green
 				Padding(0, 1)
-
-	// Suggested commands styles
-	commandsHintStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("242")). // Gray
-				Italic(true)
-
-	suggestedCommandStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("14")). // Cyan
-				Bold(true)
 
 	// Loading indicator style
 	loadingStyle = lipgloss.NewStyle().

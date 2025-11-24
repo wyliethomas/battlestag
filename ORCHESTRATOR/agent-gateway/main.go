@@ -17,6 +17,7 @@ import (
 	"agent-gateway/handlers"
 	"agent-gateway/llm"
 	"agent-gateway/middleware"
+	"agent-gateway/programs"
 
 	"github.com/gorilla/mux"
 )
@@ -98,6 +99,19 @@ func main() {
 	llmHandler := handlers.NewLLMHandler(llmClient)
 	log.Printf("LLM client initialized (endpoint: %s, model: %s)", cfg.LLM.Endpoint, cfg.LLM.Model)
 
+	// Initialize programs registry
+	programsRegistry := programs.NewRegistry()
+
+	// Register built-in programs
+	if err := programsRegistry.Register(programs.NewEchoProgram()); err != nil {
+		log.Printf("Warning: Failed to register echo program: %v", err)
+	} else {
+		log.Println("Registered program: echo")
+	}
+
+	programsHandler := handlers.NewProgramsHandler(programsRegistry)
+	log.Printf("Programs registry initialized (%d programs)", len(programsRegistry.List()))
+
 	// Create middleware
 	auth := middleware.NewAuthMiddleware(cfg.Auth.APIKey)
 	logMiddleware := middleware.Logging(accessLog)
@@ -163,6 +177,10 @@ func main() {
 	// LLM endpoints (require auth)
 	router.HandleFunc("/api/llm/chat", logMiddleware(auth.Authenticate(llmHandler.Chat))).Methods("POST", "OPTIONS")
 	router.HandleFunc("/api/llm/health", logMiddleware(auth.Authenticate(llmHandler.Health))).Methods("GET", "OPTIONS")
+
+	// Programs endpoints (require auth)
+	router.HandleFunc("/api/programs/list", logMiddleware(auth.Authenticate(programsHandler.ListPrograms))).Methods("GET", "OPTIONS")
+	router.HandleFunc("/api/programs/execute", logMiddleware(auth.Authenticate(programsHandler.ExecuteProgram))).Methods("POST", "OPTIONS")
 
 	// Root endpoint
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
