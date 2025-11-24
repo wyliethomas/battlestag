@@ -112,7 +112,13 @@ func (p *TaskManagerProgram) Info() ProgramInfo {
 	}
 }
 
-// Execute runs the task manager command
+// Execute runs the task manager command by translating API parameters
+// into calls to the installed task-manager executables (task_project_run, etc.)
+//
+// All context parameters are normalized to lowercase to handle LLM capitalization
+// variations (e.g., "Property" → "property").
+//
+// Returns ExecutionResult with output from the command execution.
 func (p *TaskManagerProgram) Execute(ctx context.Context, params map[string]interface{}) (*ExecutionResult, error) {
 	command, ok := params["command"].(string)
 	if !ok {
@@ -127,7 +133,9 @@ func (p *TaskManagerProgram) Execute(ctx context.Context, params map[string]inte
 	var cmdArgs []string
 
 	switch command {
-	// Context commands
+	// ==================== Context Management ====================
+	// Commands for managing top-level contexts (property, house, pxp, personal)
+
 	case "list-contexts":
 		cmd = exec.CommandContext(ctx, "task_project_run", "contexts", "--list")
 
@@ -138,7 +146,9 @@ func (p *TaskManagerProgram) Execute(ctx context.Context, params map[string]inte
 		}
 		cmd = exec.CommandContext(ctx, "task_project_run", "contexts", "--add", contextName)
 
-	// Project commands
+	// ==================== Project Management ====================
+	// Commands for creating, listing, and updating projects
+
 	case "add-project":
 		contextName := strings.ToLower(getStringParam(params, "context"))
 		projectName := getStringParam(params, "project_name")
@@ -178,7 +188,9 @@ func (p *TaskManagerProgram) Execute(ctx context.Context, params map[string]inte
 		}
 		cmd = exec.CommandContext(ctx, "task_project_run", cmdArgs...)
 
-	// Checklist commands
+	// ==================== Checklist Management ====================
+	// Commands for managing granular checklist items within projects
+
 	case "add-checklist":
 		projectID := getIntParam(params, "project_id")
 		items := getStringParam(params, "items")
@@ -212,7 +224,9 @@ func (p *TaskManagerProgram) Execute(ctx context.Context, params map[string]inte
 		}
 		cmd = exec.CommandContext(ctx, "task_checklist_run", "uncheck", "--id", fmt.Sprintf("%d", itemID))
 
-	// Journal commands
+	// ==================== Journal Management ====================
+	// Commands for adding and viewing narrative journal entries
+
 	case "add-journal":
 		projectID := getIntParam(params, "project_id")
 		entry := getStringParam(params, "entry")
@@ -239,7 +253,10 @@ func (p *TaskManagerProgram) Execute(ctx context.Context, params map[string]inte
 		}
 		cmd = exec.CommandContext(ctx, "task_journal_run", "latest", "--project", fmt.Sprintf("%d", projectID))
 
-	// Query commands (JSON output)
+	// ==================== Query Commands ====================
+	// Intelligent queries that return JSON output for LLM consumption
+	// These provide structured data for AI-powered suggestions and analysis
+
 	case "query-status":
 		projectID := getIntParam(params, "project_id")
 		projectName := getStringParam(params, "project_name")
@@ -322,42 +339,13 @@ func (p *TaskManagerProgram) Execute(ctx context.Context, params map[string]inte
 	}, nil
 }
 
-// Helper functions to extract parameters
+// ==================== Helper Functions ====================
+// Parameter extraction helpers (getStringParam, getIntParam, getBoolParam)
+// are now in programs/helpers.go for reuse across all programs.
 
-func getStringParam(params map[string]interface{}, name string) string {
-	if val, ok := params[name]; ok {
-		if str, ok := val.(string); ok {
-			return str
-		}
-	}
-	return ""
-}
-
-func getIntParam(params map[string]interface{}, name string) int {
-	if val, ok := params[name]; ok {
-		switch v := val.(type) {
-		case float64:
-			return int(v)
-		case int:
-			return v
-		case string:
-			var i int
-			fmt.Sscanf(v, "%d", &i)
-			return i
-		}
-	}
-	return 0
-}
-
-func getBoolParam(params map[string]interface{}, name string) bool {
-	if val, ok := params[name]; ok {
-		if b, ok := val.(bool); ok {
-			return b
-		}
-	}
-	return false
-}
-
+// formatJSON attempts to parse and pretty-print JSON output.
+// Used for query commands to make JSON output more readable.
+// Returns empty string if input isn't valid JSON.
 func formatJSON(input string) string {
 	var data interface{}
 	if err := json.Unmarshal([]byte(input), &data); err != nil {

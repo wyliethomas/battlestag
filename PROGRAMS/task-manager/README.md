@@ -2,6 +2,29 @@
 
 A hierarchical project management system designed for tracking long-running "epic" tasks across multiple life domains. Built for the Battlestag Agent ecosystem.
 
+---
+
+## 🚀 Quick Start
+
+```bash
+# Install
+cd PROGRAMS/task-manager && ./install.sh
+
+# Create your first project
+task_project_run add --name "Workshop Cleanup" --context "house" --goal "Organize tools"
+
+# Add some tasks
+task_checklist_run add --project 1 --items "Sort tools, Sweep floor, Organize shelves"
+
+# Mark one done
+task_checklist_run check --id 1
+
+# See your progress
+task_query_run overview --context "house"
+```
+
+---
+
 ## Overview
 
 This is NOT a todo list with reminders - it's a project journal with intelligent prioritization for managing nested, contextual work. Track projects hierarchically under contexts, maintain journal logs for each project, and manage granular checklist items.
@@ -272,6 +295,53 @@ task_checklist add --project 1 --items "Item 1, Item 2, Item 3"
 task_journal add --project 1 --entry "Test entry"
 task_checklist check --id 1
 task_query status --project 1
+```
+
+## Troubleshooting
+
+### Executables not found
+```bash
+# Check if they're installed
+which task_project_run
+
+# If not found, check PATH
+echo $PATH | grep ".local/bin"
+
+# Add to PATH if needed (add to ~/.bashrc or ~/.zshrc)
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### Database errors
+```bash
+# Check database exists
+ls -la ~/.local/share/task-manager/tasks.db
+
+# Check permissions
+chmod 644 ~/.local/share/task-manager/tasks.db
+
+# Reset database (WARNING: deletes all data)
+rm ~/.local/share/task-manager/tasks.db
+# Next command will recreate it
+task_project contexts --list
+```
+
+### Context not found
+```bash
+# List available contexts
+task_project contexts --list
+
+# Add missing context
+task_project contexts --add "property"
+```
+
+### query-status returns exit code 2
+This is a known issue. Use `query-overview` instead:
+```bash
+# Instead of:
+task_query status --project 1
+
+# Use:
+task_query overview --context "property"
 ```
 
 ## License
