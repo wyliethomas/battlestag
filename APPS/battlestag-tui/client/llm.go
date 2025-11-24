@@ -24,10 +24,12 @@ type ChatRequest struct {
 
 // ChatResponse represents the response from the LLM chat endpoint
 type ChatResponse struct {
-	Message           string    `json:"message"`
-	SuggestedCommands []string  `json:"suggested_commands"`
-	Model             string    `json:"model"`
-	Timestamp         time.Time `json:"timestamp"`
+	Message           string                 `json:"message"`
+	SuggestedCommands []string               `json:"suggested_commands"`
+	Model             string                 `json:"model"`
+	Timestamp         time.Time              `json:"timestamp"`
+	ProgramID         string                 `json:"program_id,omitempty"`
+	ProgramParams     map[string]interface{} `json:"program_params,omitempty"`
 }
 
 // Chat sends a message to the LLM and returns the response

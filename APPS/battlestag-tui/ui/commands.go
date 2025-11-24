@@ -161,6 +161,13 @@ func (r *CommandRegistry) registerCommands() {
 	// System sub-commands
 	systemCommands := []Command{
 		{
+			Name:        "Programs",
+			Key:         "system:programs",
+			Description: "List available programs",
+			Type:        ActionCommand,
+			Category:    "system",
+		},
+		{
 			Name:        "Settings",
 			Key:         "system:settings",
 			Description: "Configure application settings",

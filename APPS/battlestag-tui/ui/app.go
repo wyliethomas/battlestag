@@ -120,6 +120,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.waitingForLLM = false
 		m.chat.SetLoading(false)
 		m.chat.AddAssistantMessage(msg.message, msg.suggestedCommands)
+
+		// If LLM suggested a program, execute it automatically
+		if msg.programID != "" {
+			m.statusMsg = fmt.Sprintf("Executing program: %s", msg.programID)
+			return m, m.executeProgramCmd(msg.programID, msg.programParams)
+		}
+
 		return m, nil
 
 	case ShowCommandPaletteMsg:
@@ -356,6 +363,31 @@ func (m *Model) sendChatMessage(message string) tea.Cmd {
 		return ChatResponseMsg{
 			message:           response.Message,
 			suggestedCommands: response.SuggestedCommands,
+			programID:         response.ProgramID,
+			programParams:     response.ProgramParams,
+		}
+	}
+}
+
+// executeProgramCmd executes a program and displays the result
+func (m *Model) executeProgramCmd(programID string, params map[string]interface{}) tea.Cmd {
+	return func() tea.Msg {
+		result, err := m.client.ExecuteProgram(programID, params)
+		if err != nil {
+			return ErrorMsg{err: err}
+		}
+
+		if !result.Success {
+			return ChatResponseMsg{
+				message:           fmt.Sprintf("Program execution failed: %s", result.Error),
+				suggestedCommands: nil,
+			}
+		}
+
+		// Return program output as assistant message
+		return ChatResponseMsg{
+			message:           result.Output,
+			suggestedCommands: nil,
 		}
 	}
 }
@@ -389,6 +421,7 @@ Commands:
   /tech:random            - Random tech tip
   /tech:latest            - Latest tech tip
 
+  /system:programs        - List available programs
   /system:settings        - Configure application
   /system:clear           - Clear chat history
   /system:help            - Show this help
@@ -408,6 +441,10 @@ Keyboard Shortcuts:
 	case "system:settings":
 		m.statusMsg = "Settings not yet implemented"
 		return nil
+
+	case "system:programs":
+		m.statusMsg = "Fetching available programs..."
+		return m.fetchPrograms()
 
 	// Finance commands - stub implementations
 	case "finance:dashboard":
@@ -533,6 +570,42 @@ func (m *Model) fetchStoicThought(commandKey string) tea.Cmd {
 	}
 }
 
+// fetchPrograms fetches the list of available programs
+func (m *Model) fetchPrograms() tea.Cmd {
+	return func() tea.Msg {
+		programs, err := m.client.ListPrograms()
+		if err != nil {
+			return ErrorMsg{err: err}
+		}
+
+		if len(programs) == 0 {
+			return ChatResponseMsg{message: "No programs available.", suggestedCommands: nil}
+		}
+
+		message := "📦 Available Programs:\n\n"
+		for _, program := range programs {
+			message += fmt.Sprintf("• %s (%s)\n", program.Name, program.ID)
+			message += fmt.Sprintf("  %s\n", program.Description)
+			message += fmt.Sprintf("  Category: %s\n", program.Category)
+
+			if len(program.Parameters) > 0 {
+				message += "  Parameters:\n"
+				for _, param := range program.Parameters {
+					required := ""
+					if param.Required {
+						required = " (required)"
+					}
+					message += fmt.Sprintf("    - %s (%s)%s: %s\n",
+						param.Name, param.Type, required, param.Description)
+				}
+			}
+			message += "\n"
+		}
+
+		return ChatResponseMsg{message: message, suggestedCommands: nil}
+	}
+}
+
 // Helper function for max
 func max(a, b int) int {
 	if a > b {
@@ -547,6 +620,8 @@ func max(a, b int) int {
 type ChatResponseMsg struct {
 	message           string
 	suggestedCommands []string
+	programID         string
+	programParams     map[string]interface{}
 }
 
 // ErrorMsg represents an error message

@@ -16,8 +16,10 @@ type ChatRequest struct {
 
 // ChatResponse represents the data returned by the chat endpoint
 type ChatResponse struct {
-	Message            string    `json:"message"`             // AI response
-	SuggestedCommands  []string  `json:"suggested_commands"`  // Commands the AI suggests
-	Model              string    `json:"model"`               // Model used (e.g., "llama3.2:8b")
-	Timestamp          time.Time `json:"timestamp"`           // Response timestamp
+	Message            string                 `json:"message"`                       // AI response
+	SuggestedCommands  []string               `json:"suggested_commands"`            // Commands the AI suggests
+	Model              string                 `json:"model"`                         // Model used (e.g., "llama3.2:8b")
+	Timestamp          time.Time              `json:"timestamp"`                     // Response timestamp
+	ProgramID          string                 `json:"program_id,omitempty"`          // Program to execute (if any)
+	ProgramParams      map[string]interface{} `json:"program_params,omitempty"`      // Parameters for program execution
 }

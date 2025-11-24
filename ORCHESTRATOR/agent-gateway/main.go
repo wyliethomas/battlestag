@@ -89,16 +89,6 @@ func main() {
 	financialLiabilityHandler := handlers.NewFinancialLiabilityHandler(exec, dbManager)
 	financialOverviewHandler := handlers.NewFinancialOverviewHandler(dbManager)
 
-	// Initialize LLM client and handler (optional)
-	llmClient := llm.NewClient(
-		cfg.LLM.Endpoint,
-		cfg.LLM.Model,
-		cfg.LLM.SystemPrompt,
-		time.Duration(cfg.LLM.Timeout)*time.Second,
-	)
-	llmHandler := handlers.NewLLMHandler(llmClient)
-	log.Printf("LLM client initialized (endpoint: %s, model: %s)", cfg.LLM.Endpoint, cfg.LLM.Model)
-
 	// Initialize programs registry
 	programsRegistry := programs.NewRegistry()
 
@@ -111,6 +101,17 @@ func main() {
 
 	programsHandler := handlers.NewProgramsHandler(programsRegistry)
 	log.Printf("Programs registry initialized (%d programs)", len(programsRegistry.List()))
+
+	// Initialize LLM client and handler with programs support
+	llmClient := llm.NewClient(
+		cfg.LLM.Endpoint,
+		cfg.LLM.Model,
+		cfg.LLM.SystemPrompt,
+		time.Duration(cfg.LLM.Timeout)*time.Second,
+	)
+	llmHandler := handlers.NewLLMHandlerWithPrograms(llmClient, programsRegistry)
+	log.Printf("LLM client initialized with %d programs (endpoint: %s, model: %s)",
+		len(programsRegistry.List()), cfg.LLM.Endpoint, cfg.LLM.Model)
 
 	// Create middleware
 	auth := middleware.NewAuthMiddleware(cfg.Auth.APIKey)
