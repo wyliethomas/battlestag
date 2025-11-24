@@ -99,6 +99,12 @@ func main() {
 		log.Println("Registered program: echo")
 	}
 
+	if err := programsRegistry.Register(programs.NewTaskManagerProgram()); err != nil {
+		log.Printf("Warning: Failed to register task-manager program: %v", err)
+	} else {
+		log.Println("Registered program: task-manager")
+	}
+
 	programsHandler := handlers.NewProgramsHandler(programsRegistry)
 	log.Printf("Programs registry initialized (%d programs)", len(programsRegistry.List()))
 
