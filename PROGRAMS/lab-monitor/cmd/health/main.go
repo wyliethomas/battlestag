@@ -69,14 +69,14 @@ func handleCheckServer(args []string) {
 	if *id != 0 {
 		server, err = database.GetServer(*id)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Server with ID %d not found\n", *id)
-			os.Exit(exitcodes.NotFound)
+			fmt.Printf("There is no server with ID %d.\n", *id)
+			os.Exit(exitcodes.Success)
 		}
 	} else {
 		server, err = database.GetServerByName(*name)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Server '%s' not found\n", *name)
-			os.Exit(exitcodes.NotFound)
+			fmt.Printf("There is no server named '%s'.\n", *name)
+			os.Exit(exitcodes.Success)
 		}
 	}
 
@@ -230,14 +230,14 @@ func handleHistory(args []string) {
 	if *serverID != 0 {
 		server, err = database.GetServer(*serverID)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Server with ID %d not found\n", *serverID)
-			os.Exit(exitcodes.NotFound)
+			fmt.Printf("There is no server with ID %d.\n", *serverID)
+			os.Exit(exitcodes.Success)
 		}
 	} else {
 		server, err = database.GetServerByName(*serverName)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Server '%s' not found\n", *serverName)
-			os.Exit(exitcodes.NotFound)
+			fmt.Printf("There is no server named '%s'.\n", *serverName)
+			os.Exit(exitcodes.Success)
 		}
 	}
 
