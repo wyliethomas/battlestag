@@ -33,13 +33,19 @@ func (p *LabMonitorProgram) Info() ProgramInfo {
 			{
 				Name:        "server_id",
 				Type:        "int",
-				Description: "Server ID - used for update-server, remove-server, check-server, health-history, query-server-status",
+				Description: "Server ID - used for update-server, remove-server, query-server-status (alternative to server_name)",
+				Required:    false,
+			},
+			{
+				Name:        "server_name",
+				Type:        "string",
+				Description: "Server name - used for check-server, health-history (alternative to server_id). Preferred for user-facing commands.",
 				Required:    false,
 			},
 			{
 				Name:        "name",
 				Type:        "string",
-				Description: "Server name - used for add-server",
+				Description: "Server name - used for add-server only",
 				Required:    false,
 			},
 			{
@@ -157,20 +163,44 @@ func (p *LabMonitorProgram) Execute(ctx context.Context, params map[string]inter
 
 	case "check-server":
 		serverID := getIntParam(params, "server_id")
-		if serverID == 0 {
-			return &ExecutionResult{Success: false, Error: "server_id required for check-server"}, fmt.Errorf("missing server_id")
+		serverName := getStringParam(params, "server_name")
+
+		if serverID == 0 && serverName == "" {
+			return &ExecutionResult{Success: false, Error: "either server_id or server_name required for check-server"}, fmt.Errorf("missing server_id or server_name")
 		}
-		cmd = exec.CommandContext(ctx, "lab_health", "check-server", "--id", fmt.Sprintf("%d", serverID))
+
+		if serverID != 0 && serverName != "" {
+			return &ExecutionResult{Success: false, Error: "cannot specify both server_id and server_name"}, fmt.Errorf("conflicting parameters")
+		}
+
+		if serverID != 0 {
+			cmd = exec.CommandContext(ctx, "lab_health", "check-server", "--id", fmt.Sprintf("%d", serverID))
+		} else {
+			cmd = exec.CommandContext(ctx, "lab_health", "check-server", "--name", serverName)
+		}
 
 	case "check-all":
 		cmd = exec.CommandContext(ctx, "lab_health", "check-all")
 
 	case "health-history":
 		serverID := getIntParam(params, "server_id")
-		if serverID == 0 {
-			return &ExecutionResult{Success: false, Error: "server_id required for health-history"}, fmt.Errorf("missing server_id")
+		serverName := getStringParam(params, "server_name")
+
+		if serverID == 0 && serverName == "" {
+			return &ExecutionResult{Success: false, Error: "either server_id or server_name required for health-history"}, fmt.Errorf("missing server_id or server_name")
 		}
-		cmdArgs = []string{"history", "--server", fmt.Sprintf("%d", serverID)}
+
+		if serverID != 0 && serverName != "" {
+			return &ExecutionResult{Success: false, Error: "cannot specify both server_id and server_name"}, fmt.Errorf("conflicting parameters")
+		}
+
+		cmdArgs := []string{"history"}
+		if serverID != 0 {
+			cmdArgs = append(cmdArgs, "--server", fmt.Sprintf("%d", serverID))
+		} else {
+			cmdArgs = append(cmdArgs, "--name", serverName)
+		}
+
 		if limit := getIntParam(params, "limit"); limit > 0 {
 			cmdArgs = append(cmdArgs, "--limit", fmt.Sprintf("%d", limit))
 		}

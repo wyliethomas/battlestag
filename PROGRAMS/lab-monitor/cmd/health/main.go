@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"lab-monitor/db"
 	"lab-monitor/pkg/app"
 	"lab-monitor/pkg/exitcodes"
 	"lab-monitor/pkg/network"
@@ -37,15 +38,21 @@ func main() {
 
 func handleCheckServer(args []string) {
 	fs := flag.NewFlagSet("check-server", flag.ExitOnError)
-	id := fs.Int64("id", 0, "Server ID (required)")
+	id := fs.Int64("id", 0, "Server ID")
+	name := fs.String("name", "", "Server name")
 
 	if err := fs.Parse(args); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(exitcodes.ArgsError)
 	}
 
-	if *id == 0 {
-		fmt.Fprintf(os.Stderr, "Error: --id is required\n")
+	if *id == 0 && *name == "" {
+		fmt.Fprintf(os.Stderr, "Error: either --id or --name is required\n")
+		os.Exit(exitcodes.ArgsError)
+	}
+
+	if *id != 0 && *name != "" {
+		fmt.Fprintf(os.Stderr, "Error: cannot specify both --id and --name\n")
 		os.Exit(exitcodes.ArgsError)
 	}
 
@@ -57,11 +64,20 @@ func handleCheckServer(args []string) {
 	}
 	defer database.Close()
 
-	// Get server
-	server, err := database.GetServer(*id)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(exitcodes.NotFound)
+	// Get server by ID or name
+	var server *db.Server
+	if *id != 0 {
+		server, err = database.GetServer(*id)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Server with ID %d not found\n", *id)
+			os.Exit(exitcodes.NotFound)
+		}
+	} else {
+		server, err = database.GetServerByName(*name)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Server '%s' not found\n", *name)
+			os.Exit(exitcodes.NotFound)
+		}
 	}
 
 	fmt.Printf("Checking server '%s' (%s)...\n", server.Name, server.IPAddress)
@@ -182,7 +198,8 @@ func handleCheckAll(args []string) {
 
 func handleHistory(args []string) {
 	fs := flag.NewFlagSet("history", flag.ExitOnError)
-	serverID := fs.Int64("server", 0, "Server ID (required)")
+	serverID := fs.Int64("server", 0, "Server ID")
+	serverName := fs.String("name", "", "Server name")
 	limit := fs.Int("limit", 10, "Number of recent checks to show")
 
 	if err := fs.Parse(args); err != nil {
@@ -190,8 +207,13 @@ func handleHistory(args []string) {
 		os.Exit(exitcodes.ArgsError)
 	}
 
-	if *serverID == 0 {
-		fmt.Fprintf(os.Stderr, "Error: --server is required\n")
+	if *serverID == 0 && *serverName == "" {
+		fmt.Fprintf(os.Stderr, "Error: either --server or --name is required\n")
+		os.Exit(exitcodes.ArgsError)
+	}
+
+	if *serverID != 0 && *serverName != "" {
+		fmt.Fprintf(os.Stderr, "Error: cannot specify both --server and --name\n")
 		os.Exit(exitcodes.ArgsError)
 	}
 
@@ -203,15 +225,24 @@ func handleHistory(args []string) {
 	}
 	defer database.Close()
 
-	// Get server
-	server, err := database.GetServer(*serverID)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(exitcodes.NotFound)
+	// Get server by ID or name
+	var server *db.Server
+	if *serverID != 0 {
+		server, err = database.GetServer(*serverID)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Server with ID %d not found\n", *serverID)
+			os.Exit(exitcodes.NotFound)
+		}
+	} else {
+		server, err = database.GetServerByName(*serverName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Server '%s' not found\n", *serverName)
+			os.Exit(exitcodes.NotFound)
+		}
 	}
 
 	// Get health check history
-	checks, err := database.GetHealthCheckHistory(*serverID, *limit)
+	checks, err := database.GetHealthCheckHistory(server.ID, *limit)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(exitcodes.DBError)
