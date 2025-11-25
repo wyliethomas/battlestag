@@ -93,11 +93,7 @@ func main() {
 	programsRegistry := programs.NewRegistry()
 
 	// Register built-in programs
-	if err := programsRegistry.Register(programs.NewEchoProgram()); err != nil {
-		log.Printf("Warning: Failed to register echo program: %v", err)
-	} else {
-		log.Println("Registered program: echo")
-	}
+	// Echo program removed - was only for testing and LLM was using it inappropriately
 
 	if err := programsRegistry.Register(programs.NewTaskManagerProgram()); err != nil {
 		log.Printf("Warning: Failed to register task-manager program: %v", err)
