@@ -125,10 +125,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.chat.SetLoading(false)
 		m.chat.AddAssistantMessage(msg.message, msg.suggestedCommands)
 
-		// If LLM suggested a program, execute it automatically
+		// If LLM suggested a program, validate it exists before executing
 		if msg.programID != "" {
-			m.statusMsg = fmt.Sprintf("Executing program: %s", msg.programID)
-			return m, m.executeProgramCmd(msg.programID, msg.programParams)
+			// Validate program exists
+			programs, err := m.client.ListPrograms()
+			if err != nil {
+				// Can't validate, log and skip execution
+				m.statusMsg = "Warning: Could not validate program"
+				return m, nil
+			}
+
+			// Check if program exists in registry
+			programExists := false
+			for _, prog := range programs {
+				if prog.ID == msg.programID {
+					programExists = true
+					break
+				}
+			}
+
+			if programExists {
+				// Program is valid, execute it
+				m.statusMsg = fmt.Sprintf("Executing program: %s", msg.programID)
+				return m, m.executeProgramCmd(msg.programID, msg.programParams)
+			} else {
+				// LLM hallucinated a program name - log and ignore
+				fmt.Printf("[WARNING] LLM suggested non-existent program: '%s' - treating as normal chat\n", msg.programID)
+				m.statusMsg = fmt.Sprintf("Note: LLM suggested non-existent program '%s', ignoring", msg.programID)
+				// Just continue with the chat response, don't try to execute
+			}
 		}
 
 		return m, nil
