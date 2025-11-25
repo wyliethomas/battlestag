@@ -33,13 +33,13 @@ func (p *LabMonitorProgram) Info() ProgramInfo {
 			{
 				Name:        "server_id",
 				Type:        "int",
-				Description: "Server ID - used for update-server, remove-server, query-server-status (alternative to server_name)",
+				Description: "Server ID (numeric) - ONLY use if you have the numeric ID. For update-server, remove-server, query-server-status",
 				Required:    false,
 			},
 			{
 				Name:        "server_name",
 				Type:        "string",
-				Description: "Server name - used for check-server, health-history (alternative to server_id). Preferred for user-facing commands.",
+				Description: "Server name (e.g., 'yellowstone', 'glacier') - USE THIS when user mentions a server by name. For check-server, health-history. Examples: if user says 'check glacier', use server_name='glacier'",
 				Required:    false,
 			},
 			{
