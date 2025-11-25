@@ -189,6 +189,13 @@ IMPORTANT RULES:
 7. Do NOT try to answer the question yourself - let the program provide the data
 8. Your message should ONLY explain what you're doing, not provide the answer
 
+CRITICAL: When reading program output (especially JSON), present EXACTLY what the program returned.
+- Do NOT make up, infer, or fabricate data
+- Do NOT change values from what the program reported
+- If a server status is "unknown", say "unknown" - do NOT guess "online" or "offline"
+- If a field says 0, report 0 - do NOT make up a different number
+- Read the actual values carefully and present them accurately
+
 Example (Adding data):
 User: "Add a new project called Workshop to house context with goal of organizing tools"
 Your response:
