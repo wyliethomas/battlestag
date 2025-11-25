@@ -212,9 +212,9 @@ func (p *LabMonitorProgram) Execute(ctx context.Context, params map[string]inter
 		}, err
 	}
 
-	// For query commands, try to pretty-print JSON
+	// For query commands, format output for human readability
 	if strings.HasPrefix(command, "query-") {
-		if formatted := formatJSONLabMonitor(outputStr); formatted != "" {
+		if formatted := formatLabMonitorOutput(command, outputStr); formatted != "" {
 			outputStr = formatted
 		}
 	}
@@ -225,17 +225,161 @@ func (p *LabMonitorProgram) Execute(ctx context.Context, params map[string]inter
 	}, nil
 }
 
-// formatJSONLabMonitor attempts to parse and pretty-print JSON output.
-// Used for query commands to make JSON output more readable.
-// Returns empty string if input isn't valid JSON.
-func formatJSONLabMonitor(input string) string {
-	var data interface{}
-	if err := json.Unmarshal([]byte(input), &data); err != nil {
-		return ""
+// formatLabMonitorOutput converts JSON query output to human-readable format
+func formatLabMonitorOutput(command, jsonOutput string) string {
+	switch command {
+	case "query-overview":
+		return formatOverview(jsonOutput)
+	case "query-server-status":
+		return formatServerStatus(jsonOutput)
+	case "query-offline":
+		return formatOfflineServers(jsonOutput)
+	default:
+		return jsonOutput
 	}
-	formatted, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
-		return ""
+}
+
+// formatOverview formats the overview JSON into readable text
+func formatOverview(jsonStr string) string {
+	var data struct {
+		TotalServers   int `json:"total_servers"`
+		OnlineServers  int `json:"online_servers"`
+		OfflineServers int `json:"offline_servers"`
+		Servers        []struct {
+			ID        int64  `json:"id"`
+			Name      string `json:"name"`
+			IPAddress string `json:"ip_address"`
+			Status    string `json:"status"`
+			LastSeen  string `json:"last_seen,omitempty"`
+		} `json:"servers"`
 	}
-	return string(formatted)
+
+	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
+		return jsonStr // Return original if parsing fails
+	}
+
+	var output strings.Builder
+	output.WriteString("📊 Lab Monitor Overview\n\n")
+	output.WriteString(fmt.Sprintf("Total Servers: %d\n", data.TotalServers))
+	output.WriteString(fmt.Sprintf("  🟢 Online:  %d\n", data.OnlineServers))
+	output.WriteString(fmt.Sprintf("  🔴 Offline: %d\n", data.OfflineServers))
+	output.WriteString(fmt.Sprintf("  ⚪ Unknown: %d\n\n", data.TotalServers-data.OnlineServers-data.OfflineServers))
+
+	if len(data.Servers) > 0 {
+		output.WriteString("Servers:\n")
+		for _, server := range data.Servers {
+			statusIcon := "⚪"
+			if server.Status == "online" {
+				statusIcon = "🟢"
+			} else if server.Status == "offline" {
+				statusIcon = "🔴"
+			}
+
+			output.WriteString(fmt.Sprintf("  %s [%d] %s (%s) - %s\n",
+				statusIcon, server.ID, server.Name, server.IPAddress, server.Status))
+			if server.LastSeen != "" {
+				output.WriteString(fmt.Sprintf("      Last seen: %s\n", server.LastSeen))
+			}
+		}
+	}
+
+	return output.String()
+}
+
+// formatServerStatus formats server status JSON into readable text
+func formatServerStatus(jsonStr string) string {
+	var data struct {
+		ID           int64  `json:"id"`
+		Name         string `json:"name"`
+		IPAddress    string `json:"ip_address"`
+		SSHUser      string `json:"ssh_user"`
+		SSHPort      int    `json:"ssh_port"`
+		Status       string `json:"status"`
+		LastSeen     string `json:"last_seen,omitempty"`
+		Notes        string `json:"notes,omitempty"`
+		RecentChecks []struct {
+			CheckType      string `json:"check_type"`
+			Status         string `json:"status"`
+			ResponseTimeMS int    `json:"response_time_ms"`
+			Timestamp      string `json:"timestamp"`
+			ErrorMessage   string `json:"error_message,omitempty"`
+		} `json:"recent_checks"`
+	}
+
+	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
+		return jsonStr
+	}
+
+	var output strings.Builder
+	statusIcon := "⚪"
+	if data.Status == "online" {
+		statusIcon = "🟢"
+	} else if data.Status == "offline" {
+		statusIcon = "🔴"
+	}
+
+	output.WriteString(fmt.Sprintf("🖥️  Server: %s\n\n", data.Name))
+	output.WriteString(fmt.Sprintf("Status: %s %s\n", statusIcon, data.Status))
+	output.WriteString(fmt.Sprintf("IP: %s\n", data.IPAddress))
+	output.WriteString(fmt.Sprintf("SSH: %s@%s:%d\n", data.SSHUser, data.IPAddress, data.SSHPort))
+	if data.LastSeen != "" {
+		output.WriteString(fmt.Sprintf("Last Seen: %s\n", data.LastSeen))
+	}
+	if data.Notes != "" {
+		output.WriteString(fmt.Sprintf("Notes: %s\n", data.Notes))
+	}
+
+	if len(data.RecentChecks) > 0 {
+		output.WriteString("\nRecent Health Checks:\n")
+		for _, check := range data.RecentChecks {
+			checkIcon := "✓"
+			if check.Status != "success" {
+				checkIcon = "✗"
+			}
+			output.WriteString(fmt.Sprintf("  %s %s [%s]", checkIcon, check.Timestamp, check.CheckType))
+			if check.ResponseTimeMS > 0 {
+				output.WriteString(fmt.Sprintf(" - %dms", check.ResponseTimeMS))
+			}
+			if check.ErrorMessage != "" {
+				output.WriteString(fmt.Sprintf(" - %s", check.ErrorMessage))
+			}
+			output.WriteString("\n")
+		}
+	}
+
+	return output.String()
+}
+
+// formatOfflineServers formats offline servers JSON into readable text
+func formatOfflineServers(jsonStr string) string {
+	var data struct {
+		OfflineServers []struct {
+			ID        int64  `json:"id"`
+			Name      string `json:"name"`
+			IPAddress string `json:"ip_address"`
+			Status    string `json:"status"`
+			LastSeen  string `json:"last_seen,omitempty"`
+		} `json:"offline_servers"`
+		Count int `json:"count"`
+	}
+
+	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
+		return jsonStr
+	}
+
+	var output strings.Builder
+	output.WriteString(fmt.Sprintf("🔴 Offline Servers: %d\n\n", data.Count))
+
+	if data.Count == 0 {
+		output.WriteString("All servers are online! 🎉\n")
+	} else {
+		for _, server := range data.OfflineServers {
+			output.WriteString(fmt.Sprintf("  [%d] %s (%s)\n", server.ID, server.Name, server.IPAddress))
+			if server.LastSeen != "" {
+				output.WriteString(fmt.Sprintf("      Last seen: %s\n", server.LastSeen))
+			}
+		}
+	}
+
+	return output.String()
 }
