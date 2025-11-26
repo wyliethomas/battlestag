@@ -3,7 +3,10 @@
 set -e  # Exit on error
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BIN_DIR="${HOME}/Work/BATTLESTAG-BOT/bin"
+
+# Find BATTLESTAG-BOT root by going up from script location
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+BIN_DIR="$REPO_ROOT/bin"
 CONFIG_DIR="${HOME}/.config/agent-gateway"
 
 echo "=== Agent Gateway Installation ===="

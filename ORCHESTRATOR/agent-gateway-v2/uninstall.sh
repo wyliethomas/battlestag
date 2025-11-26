@@ -2,7 +2,11 @@
 
 set -e  # Exit on error
 
-BIN_DIR="${HOME}/Work/BATTLESTAG-BOT/bin"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Find BATTLESTAG-BOT root by going up from script location
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+BIN_DIR="$REPO_ROOT/bin"
 CONFIG_DIR="${HOME}/.config/agent-gateway"
 
 echo "=== Agent Gateway Uninstallation ===="
@@ -52,8 +56,8 @@ echo ""
 echo "=== Uninstallation Complete! ==="
 echo ""
 echo "Note: This script only removes the installed binary and config."
-echo "The source code in $(pwd) is preserved."
+echo "The source code in $SCRIPT_DIR is preserved."
 echo ""
 echo "To completely remove the source code:"
-echo "  rm -rf $(pwd)"
+echo "  rm -rf $SCRIPT_DIR"
 echo ""
