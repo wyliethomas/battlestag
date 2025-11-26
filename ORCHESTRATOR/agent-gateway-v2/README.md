@@ -20,9 +20,15 @@ A manifest-driven REST API gateway for orchestrating LLM function calling with l
 ```
 
 This will:
+- Prompt for configuration (Ollama URL, model, port)
 - Build the gateway and all programs
-- Install binary to `~/Work/BATTLESTAG-BOT/bin`
+- Install binary to `<repo-root>/bin`
 - Create config at `~/.config/agent-gateway/config.yaml`
+
+**Interactive Setup:** The installer will ask for:
+- Ollama server URL (default: http://localhost:11434)
+- Ollama model (default: llama3.1:8b)
+- Server port (default: 8080)
 
 ### Configuration
 
@@ -68,7 +74,9 @@ Builds and installs the gateway and all programs.
 ```bash
 ./update.sh
 ```
-Rebuilds gateway and programs. Optionally stops/restarts the service.
+Rebuilds gateway and programs. Optionally updates configuration and restarts the service.
+
+**Configuration Update:** Prompts to update config with current values shown as defaults.
 
 ### Uninstall
 ```bash

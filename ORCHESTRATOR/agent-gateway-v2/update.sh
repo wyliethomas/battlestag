@@ -59,17 +59,84 @@ done
 
 echo "✓ Rebuilt $PROGRAMS_REBUILT programs"
 
-# Check for config updates
-if [ -f "$SCRIPT_DIR/config.example.yaml" ] && [ -f "$CONFIG_DIR/config.yaml" ]; then
+# Config update function
+update_config() {
     echo ""
-    echo "Checking for config changes..."
+    echo "=== Configuration Update ==="
+    echo ""
 
-    # Compare example config with user config (just inform, don't overwrite)
-    echo "  Your config: $CONFIG_DIR/config.yaml"
-    echo "  Example config: $SCRIPT_DIR/config.example.yaml"
+    read -p "Do you want to update the configuration? (y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Keeping existing configuration"
+        return
+    fi
+
+    # Load existing config values
+    local CURRENT_OLLAMA_URL=""
+    local CURRENT_OLLAMA_MODEL=""
+    local CURRENT_PORT=""
+
+    if [ -f "$CONFIG_DIR/config.yaml" ]; then
+        CURRENT_OLLAMA_URL=$(grep -A1 "^ollama:" "$CONFIG_DIR/config.yaml" | grep "url:" | awk '{print $2}' || echo "")
+        CURRENT_OLLAMA_MODEL=$(grep -A2 "^ollama:" "$CONFIG_DIR/config.yaml" | grep "model:" | awk '{print $2}' || echo "")
+        CURRENT_PORT=$(grep -A1 "^server:" "$CONFIG_DIR/config.yaml" | grep "port:" | awk '{print $2}' || echo "")
+    fi
+
+    # Set defaults from current config or fallback
+    local DEFAULT_OLLAMA_URL="${CURRENT_OLLAMA_URL:-http://localhost:11434}"
+    local DEFAULT_OLLAMA_MODEL="${CURRENT_OLLAMA_MODEL:-llama3.1:8b}"
+    local DEFAULT_PORT="${CURRENT_PORT:-8080}"
+
     echo ""
-    echo "  Review config.example.yaml for any new configuration options"
-fi
+    echo "Current configuration:"
+    echo "  Ollama URL: $DEFAULT_OLLAMA_URL"
+    echo "  Ollama Model: $DEFAULT_OLLAMA_MODEL"
+    echo "  Server Port: $DEFAULT_PORT"
+    echo ""
+    echo "Press Enter to keep current value, or type new value:"
+    echo ""
+
+    # Prompt for values
+    read -p "Ollama server URL [$DEFAULT_OLLAMA_URL]: " OLLAMA_URL
+    OLLAMA_URL="${OLLAMA_URL:-$DEFAULT_OLLAMA_URL}"
+
+    read -p "Ollama model [$DEFAULT_OLLAMA_MODEL]: " OLLAMA_MODEL
+    OLLAMA_MODEL="${OLLAMA_MODEL:-$DEFAULT_OLLAMA_MODEL}"
+
+    read -p "Server port [$DEFAULT_PORT]: " PORT
+    PORT="${PORT:-$DEFAULT_PORT}"
+
+    # Write config file
+    cat > "$CONFIG_DIR/config.yaml" <<EOF
+# Agent Gateway Configuration File
+# Updated by update.sh
+
+# Ollama server settings
+ollama:
+  url: $OLLAMA_URL
+  model: $OLLAMA_MODEL
+
+# HTTP server settings
+server:
+  port: $PORT
+
+# Program execution settings
+execution:
+  timeout: 30s
+
+# Programs directory (relative to gateway binary)
+programs:
+  directory: ./programs
+EOF
+
+    echo ""
+    echo "✓ Config file updated: $CONFIG_DIR/config.yaml"
+    echo ""
+}
+
+# Update configuration
+update_config
 
 echo ""
 echo "=== Update Complete! ==="
