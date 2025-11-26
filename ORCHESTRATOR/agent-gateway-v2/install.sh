@@ -74,9 +74,9 @@ server:
 execution:
   timeout: 30s
 
-# Programs directory (relative to gateway binary)
+# Programs directory (relative to gateway working directory)
 programs:
-  directory: ./programs
+  directory: ../../PROGRAMS
 EOF
 
     echo ""
@@ -98,11 +98,18 @@ echo "Building agent-gateway..."
 go build -o "$BIN_DIR/agent-gateway" main.go config.go
 echo "✓ Gateway built: $BIN_DIR/agent-gateway"
 
-# Build programs
+# Build programs from top-level PROGRAMS directory
 echo "Building programs..."
 PROGRAMS_BUILT=0
+PROGRAMS_DIR="$REPO_ROOT/PROGRAMS"
 
-for program_dir in "$SCRIPT_DIR/programs"/*; do
+if [ ! -d "$PROGRAMS_DIR" ]; then
+    echo "⚠️  PROGRAMS directory not found at: $PROGRAMS_DIR"
+    echo "   Creating it for you..."
+    mkdir -p "$PROGRAMS_DIR"
+fi
+
+for program_dir in "$PROGRAMS_DIR"/*; do
     if [ -d "$program_dir" ]; then
         program_name=$(basename "$program_dir")
 

@@ -1,0 +1,63 @@
+{
+  "name": "lab-monitor",
+  "description": "Home lab server monitoring and health check system. Manages servers with ping and SSH health checks. Use this for server status, uptime monitoring, and connectivity verification.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "command": {
+        "type": "string",
+        "description": "Command to execute",
+        "enum": [
+          "add-server",
+          "list-servers",
+          "update-server",
+          "remove-server",
+          "check-server",
+          "check-all",
+          "health-history",
+          "query-overview",
+          "query-server-status",
+          "query-offline"
+        ]
+      },
+      "server_id": {
+        "type": "integer",
+        "description": "Server ID (numeric) - ONLY use if you have the numeric ID. For update-server, remove-server, query-server-status"
+      },
+      "server_name": {
+        "type": "string",
+        "description": "Server name (e.g., 'yellowstone', 'glacier') - USE THIS when user mentions a server by name. For check-server, health-history"
+      },
+      "name": {
+        "type": "string",
+        "description": "Server name - used for add-server only"
+      },
+      "ip": {
+        "type": "string",
+        "description": "Server IP address - used for add-server"
+      },
+      "ssh_user": {
+        "type": "string",
+        "description": "SSH username - used for add-server (default: current user)"
+      },
+      "ssh_port": {
+        "type": "integer",
+        "description": "SSH port - used for add-server (default: 22)"
+      },
+      "notes": {
+        "type": "string",
+        "description": "Server notes - used for add-server, update-server"
+      },
+      "status": {
+        "type": "string",
+        "description": "Server status filter (online, offline, unknown) - used for list-servers",
+        "enum": ["online", "offline", "unknown"]
+      },
+      "limit": {
+        "type": "integer",
+        "description": "Limit number of health check results - used for health-history (default: 10)"
+      }
+    },
+    "required": ["command"]
+  }
+}

@@ -38,26 +38,32 @@ echo "Rebuilding agent-gateway..."
 go build -o "$BIN_DIR/agent-gateway" main.go config.go
 echo "✓ Gateway rebuilt: $BIN_DIR/agent-gateway"
 
-# Rebuild programs
+# Rebuild programs from top-level PROGRAMS directory
 echo "Rebuilding programs..."
 PROGRAMS_REBUILT=0
+PROGRAMS_DIR="$REPO_ROOT/PROGRAMS"
 
-for program_dir in "$SCRIPT_DIR/programs"/*; do
-    if [ -d "$program_dir" ]; then
-        program_name=$(basename "$program_dir")
+if [ ! -d "$PROGRAMS_DIR" ]; then
+    echo "⚠️  PROGRAMS directory not found at: $PROGRAMS_DIR"
+    echo "   No programs to rebuild."
+else
+    for program_dir in "$PROGRAMS_DIR"/*; do
+        if [ -d "$program_dir" ]; then
+            program_name=$(basename "$program_dir")
 
-        # Check if there's a Go source file
-        if ls "$program_dir"/*.go 1> /dev/null 2>&1; then
-            echo "  - Rebuilding $program_name..."
-            cd "$program_dir"
-            go build -o "$program_name" *.go
-            PROGRAMS_REBUILT=$((PROGRAMS_REBUILT + 1))
-            cd "$SCRIPT_DIR"
+            # Check if there's a Go source file
+            if ls "$program_dir"/*.go 1> /dev/null 2>&1; then
+                echo "  - Rebuilding $program_name..."
+                cd "$program_dir"
+                go build -o "$program_name" *.go
+                PROGRAMS_REBUILT=$((PROGRAMS_REBUILT + 1))
+                cd "$SCRIPT_DIR"
+            fi
         fi
-    fi
-done
+    done
 
-echo "✓ Rebuilt $PROGRAMS_REBUILT programs"
+    echo "✓ Rebuilt $PROGRAMS_REBUILT programs"
+fi
 
 # Config update function
 update_config() {
@@ -125,9 +131,9 @@ server:
 execution:
   timeout: 30s
 
-# Programs directory (relative to gateway binary)
+# Programs directory (relative to gateway working directory)
 programs:
-  directory: ./programs
+  directory: ../../PROGRAMS
 EOF
 
     echo ""
