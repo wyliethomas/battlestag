@@ -1,0 +1,19 @@
+# Agent Gateway Configuration File
+# Copy this to config.yaml and customize for your environment
+
+# Ollama server settings
+ollama:
+  url: http://192.168.1.232:11434
+  model: llama3.1:8b
+
+# HTTP server settings
+server:
+  port: 8080
+
+# Program execution settings
+execution:
+  timeout: 30s
+
+# Programs directory (relative to gateway binary)
+programs:
+  directory: ./programs

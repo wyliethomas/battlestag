@@ -22,7 +22,7 @@ func main() {
 	showOnboarding := !config.ConfigExists()
 
 	// Create API client from configuration
-	apiClient := client.NewClientWithConfig(cfg.AgentGateway.URL, cfg.AgentGateway.APIKey)
+	apiClient := client.NewClientWithConfig(cfg.AgentGateway.URL)
 
 	// Test connection before starting TUI (unless onboarding)
 	if !showOnboarding {

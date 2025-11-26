@@ -11,7 +11,7 @@ import (
 // OnboardingModel represents the onboarding screen state
 type OnboardingModel struct {
 	config       *config.Config
-	focusedField int // 0=URL, 1=APIKey, 2=TestButton, 3=SaveButton
+	focusedField int // 0=URL, 1=TestButton, 2=SaveButton
 	testing      bool
 	testResult   string
 	testError    error
@@ -52,38 +52,32 @@ func (m OnboardingModel) Update(msg tea.Msg) (OnboardingModel, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "tab", "down":
-			m.focusedField = (m.focusedField + 1) % 4
+			m.focusedField = (m.focusedField + 1) % 3
 		case "shift+tab", "up":
-			m.focusedField = (m.focusedField - 1 + 4) % 4
+			m.focusedField = (m.focusedField - 1 + 3) % 3
 		case "enter":
 			switch m.focusedField {
-			case 2: // Test Connection
+			case 1: // Test Connection
 				m.testing = true
 				m.testResult = ""
 				m.testError = nil
 				return m, m.testConnection()
-			case 3: // Save & Continue
+			case 2: // Save & Continue
 				return m, m.saveConfig()
 			}
 		case "backspace":
 			if m.focusedField == 0 && len(m.config.AgentGateway.URL) > 0 {
 				m.config.AgentGateway.URL = m.config.AgentGateway.URL[:len(m.config.AgentGateway.URL)-1]
-			} else if m.focusedField == 1 && len(m.config.AgentGateway.APIKey) > 0 {
-				m.config.AgentGateway.APIKey = m.config.AgentGateway.APIKey[:len(m.config.AgentGateway.APIKey)-1]
 			}
 		case "ctrl+u": // Clear field
 			if m.focusedField == 0 {
 				m.config.AgentGateway.URL = ""
-			} else if m.focusedField == 1 {
-				m.config.AgentGateway.APIKey = ""
 			}
 		default:
 			// Type into fields
 			if len(msg.String()) == 1 {
 				if m.focusedField == 0 {
 					m.config.AgentGateway.URL += msg.String()
-				} else if m.focusedField == 1 {
-					m.config.AgentGateway.APIKey += msg.String()
 				}
 			}
 		}
@@ -95,7 +89,7 @@ func (m OnboardingModel) Update(msg tea.Msg) (OnboardingModel, tea.Cmd) {
 // testConnection tests the connection to the Agent Gateway
 func (m *OnboardingModel) testConnection() tea.Cmd {
 	return func() tea.Msg {
-		c := client.NewClientWithConfig(m.config.AgentGateway.URL, m.config.AgentGateway.APIKey)
+		c := client.NewClientWithConfig(m.config.AgentGateway.URL)
 		health, err := c.Health()
 		if err != nil {
 			return ConnectionTestMsg{err: err}
@@ -136,29 +130,17 @@ You can change these settings later from the Settings screen.
 	}
 	urlField := fmt.Sprintf("%s\n%s", urlLabel, urlInput)
 
-	// API Key field
-	keyLabel := labelStyle.Render("API Key:")
-	keyValue := m.config.AgentGateway.APIKey
-	if m.focusedField == 1 {
-		keyValue += "█" // Cursor
-	}
-	keyInput := focusedInputStyle.Render(keyValue)
-	if m.focusedField != 1 {
-		keyInput = inputStyle.Render(keyValue)
-	}
-	keyField := fmt.Sprintf("%s\n%s", keyLabel, keyInput)
-
 	// Buttons
 	testButton := "[Test Connection]"
 	saveButton := "[Save & Continue]"
 
-	if m.focusedField == 2 {
+	if m.focusedField == 1 {
 		testButton = activeTabStyle.Render(testButton)
 	} else {
 		testButton = tabStyle.Render(testButton)
 	}
 
-	if m.focusedField == 3 {
+	if m.focusedField == 2 {
 		saveButton = activeTabStyle.Render(saveButton)
 	} else {
 		saveButton = tabStyle.Render(saveButton)
@@ -183,7 +165,7 @@ You can change these settings later from the Settings screen.
 	// Help text
 	help := helpStyle.Render("\n\n[Tab/↑↓] Navigate • [Enter] Select • [Ctrl+U] Clear field • [Backspace] Delete")
 
-	content := title + intro + "\n\n" + urlField + "\n\n" + keyField + "\n\n" + buttons + statusMsg + help
+	content := title + intro + "\n\n" + urlField + "\n\n" + buttons + statusMsg + help
 
 	return boxStyle.Render(content)
 }

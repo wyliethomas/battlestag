@@ -14,20 +14,18 @@ type Config struct {
 	Version      string             `yaml:"version"`
 }
 
-// AgentGatewayConfig represents the Agent Gateway connection settings
+// AgentGatewayConfig represents the Agent Gateway connection settings (v2)
 type AgentGatewayConfig struct {
-	URL    string `yaml:"url"`
-	APIKey string `yaml:"api_key"`
+	URL string `yaml:"url"`
 }
 
 // DefaultConfig returns the default configuration
 func DefaultConfig() *Config {
 	return &Config{
 		AgentGateway: AgentGatewayConfig{
-			URL:    "http://192.168.1.140:8080",
-			APIKey: "your-secret-api-key-here",
+			URL: "http://localhost:8080", // Gateway v2 default
 		},
-		Version: "1.0",
+		Version: "2.0", // Updated for gateway v2
 	}
 }
 
@@ -98,9 +96,7 @@ func Load() (*Config, error) {
 		cfg.AgentGateway.URL = url
 	}
 
-	if apiKey := os.Getenv("AGENT_GATEWAY_API_KEY"); apiKey != "" {
-		cfg.AgentGateway.APIKey = apiKey
-	}
+	// Gateway v2 doesn't require API key
 
 	return cfg, nil
 }
@@ -136,15 +132,13 @@ func Save(cfg *Config) error {
 	return nil
 }
 
-// Validate validates the configuration
+// Validate validates the configuration (v2 - no API key required)
 func (c *Config) Validate() error {
 	if c.AgentGateway.URL == "" {
 		return fmt.Errorf("agent gateway URL cannot be empty")
 	}
 
-	if c.AgentGateway.APIKey == "" {
-		return fmt.Errorf("agent gateway API key cannot be empty")
-	}
+	// Gateway v2 doesn't require API key validation
 
 	return nil
 }

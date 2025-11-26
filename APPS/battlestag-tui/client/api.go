@@ -14,41 +14,33 @@ import (
 	"battlestag/models"
 )
 
-// Client represents the API client
+// Client represents the API client for gateway v2
 type Client struct {
 	BaseURL    string
-	APIKey     string
 	HTTPClient *http.Client
 }
 
 // NewClient creates a new API client from environment variables
-// Deprecated: Use NewClientWithConfig instead
 func NewClient() *Client {
 	baseURL := os.Getenv("AGENT_GATEWAY_URL")
 	if baseURL == "" {
-		baseURL = "http://192.168.1.140:8080"
+		baseURL = "http://localhost:8080" // Gateway v2 default
 	}
 
-	apiKey := os.Getenv("AGENT_GATEWAY_API_KEY")
-	if apiKey == "" {
-		apiKey = "your-secret-api-key-here" // Default matching server config at /etc/agent-gateway/config.yaml
-	}
-
-	return NewClientWithConfig(baseURL, apiKey)
+	return NewClientWithConfig(baseURL)
 }
 
-// NewClientWithConfig creates a new API client with explicit URL and API key
-func NewClientWithConfig(baseURL, apiKey string) *Client {
+// NewClientWithConfig creates a new API client with explicit URL
+func NewClientWithConfig(baseURL string) *Client {
 	return &Client{
 		BaseURL: baseURL,
-		APIKey:  apiKey,
 		HTTPClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
 	}
 }
 
-// doRequest performs an HTTP request with authentication
+// doRequest performs an HTTP request (no authentication needed for v2)
 func (c *Client) doRequest(method, endpoint string, body interface{}) (*http.Response, error) {
 	var reqBody io.Reader
 	if body != nil {
@@ -64,7 +56,7 @@ func (c *Client) doRequest(method, endpoint string, body interface{}) (*http.Res
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("X-API-Key", c.APIKey)
+	// Gateway v2 doesn't require authentication
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -318,7 +310,7 @@ func (c *Client) UploadStatement(filePath string) error {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("X-API-Key", c.APIKey)
+	// Gateway v2 doesn't require authentication
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	resp, err := c.HTTPClient.Do(req)

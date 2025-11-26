@@ -23,7 +23,15 @@
       "Bash(./task_journal latest:*)",
       "Bash(./task_project update:*)",
       "Bash(./task_query closing:*)",
-      "Bash(./task_query context:*)"
+      "Bash(./task_query context:*)",
+      "Bash(./agent-gateway)",
+      "Bash(curl:*)",
+      "Bash(timeout:*)",
+      "Bash(./programs/echo/echo:*)",
+      "Bash(./programs/time/time:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)",
+      "Bash(pgrep:*)"
     ],
     "deny": [],
     "ask": []

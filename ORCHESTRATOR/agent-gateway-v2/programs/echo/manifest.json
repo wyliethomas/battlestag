@@ -1,0 +1,14 @@
+{
+  "name": "echo",
+  "description": "Echoes back the provided message",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "message": {
+        "type": "string",
+        "description": "The message to echo back"
+      }
+    },
+    "required": ["message"]
+  }
+}

@@ -38,7 +38,7 @@ func (c *Client) ListPrograms() ([]ProgramInfo, error) {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("X-API-Key", c.APIKey)
+	// Gateway v2 doesn't require authentication
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
@@ -84,7 +84,7 @@ func (c *Client) ExecuteProgram(programID string, parameters map[string]interfac
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("X-API-Key", c.APIKey)
+	// Gateway v2 doesn't require authentication
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.HTTPClient.Do(req)

@@ -1,0 +1,87 @@
+{
+  "name": "task-manager",
+  "description": "Hierarchical project management system for tracking long-running tasks across life domains (property, house, pxp, personal). Manages projects with journal logs and checklists. Use this for task tracking, project status, and intelligent work suggestions.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "command": {
+        "type": "string",
+        "description": "Command to execute",
+        "enum": [
+          "list-contexts",
+          "add-context",
+          "add-project",
+          "list-projects",
+          "update-project",
+          "add-checklist",
+          "list-checklist",
+          "check-item",
+          "uncheck-item",
+          "add-journal",
+          "list-journal",
+          "latest-journal",
+          "query-status",
+          "query-overview",
+          "query-suggest",
+          "query-neglected",
+          "query-closing",
+          "query-context"
+        ]
+      },
+      "context": {
+        "type": "string",
+        "description": "Context name (property, house, pxp, personal) - used for add-context, add-project, list-projects, query-overview, query-suggest, query-context"
+      },
+      "project_id": {
+        "type": "integer",
+        "description": "Project ID - used for update-project, add-checklist, list-checklist, add-journal, list-journal, latest-journal, query-status"
+      },
+      "project_name": {
+        "type": "string",
+        "description": "Project name - used for add-project or query-status (alternative to project_id)"
+      },
+      "goal": {
+        "type": "string",
+        "description": "Project goal - used for add-project, update-project"
+      },
+      "status": {
+        "type": "string",
+        "description": "Project status - used for update-project, list-projects",
+        "enum": ["active", "paused", "blocked", "complete"]
+      },
+      "items": {
+        "type": "string",
+        "description": "Comma-separated checklist items - used for add-checklist"
+      },
+      "item_id": {
+        "type": "integer",
+        "description": "Checklist item ID - used for check-item, uncheck-item"
+      },
+      "entry": {
+        "type": "string",
+        "description": "Journal entry content - used for add-journal"
+      },
+      "limit": {
+        "type": "integer",
+        "description": "Limit number of results - used for list-journal"
+      },
+      "pending_only": {
+        "type": "boolean",
+        "description": "Show only incomplete items - used for list-checklist"
+      },
+      "time_available": {
+        "type": "string",
+        "description": "Time available (e.g., '3 days', 'weekend') - used for query-suggest"
+      },
+      "days": {
+        "type": "integer",
+        "description": "Number of days - used for query-neglected (default: 14)"
+      },
+      "threshold": {
+        "type": "integer",
+        "description": "Completion threshold percentage - used for query-closing (default: 70)"
+      }
+    },
+    "required": ["command"]
+  }
+}
