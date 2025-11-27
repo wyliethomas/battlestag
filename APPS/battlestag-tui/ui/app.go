@@ -18,6 +18,8 @@ const (
 	OnboardingMode ViewMode = iota
 	ChatMode
 	CommandPaletteMode
+	SettingsMode
+	ProgramsMode
 )
 
 // Model represents the main application state
@@ -35,6 +37,8 @@ type Model struct {
 	chat       *ChatModel
 	prompt     PromptModel
 	palette    *PaletteModel
+	settings   *SettingsModel
+	programs   *ProgramsModel
 
 	// State
 	waitingForLLM bool
@@ -59,6 +63,8 @@ func NewModel(apiClient *client.Client, cfg *config.Config, showOnboarding bool)
 		chat:       NewChatModel(apiClient),
 		prompt:     NewPromptModel(),
 		palette:    NewPaletteModel(),
+		settings:   NewSettingsModel(cfg),
+		programs:   NewProgramsModel(apiClient),
 		connected:  true, // Start optimistic
 	}
 }
@@ -103,9 +109,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case ConfigSavedMsg:
-		// Config was saved from onboarding, start chat mode
-		if m.mode == OnboardingMode {
+		// Config was saved, return to chat mode
+		if m.mode == OnboardingMode || m.mode == SettingsMode {
 			m.mode = ChatMode
+			m.statusMsg = "Settings saved successfully!"
+			// Update client with new config
+			m.client = client.NewClientWithConfig(m.config.AgentGateway.URL)
+			// IMPORTANT: Also update chat model's client reference (preserving history)
+			m.chat.UpdateClient(m.client)
+			// Reinitialize programs model with new client
+			m.programs = NewProgramsModel(m.client)
+			// Trigger connection check
+			return m, doConnectionCheck(m.client)
 		}
 		return m, nil
 
@@ -138,7 +153,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Check if program exists in registry
 			programExists := false
 			for _, prog := range programs {
-				if prog.ID == msg.programID {
+				if prog.Name == msg.programID {
 					programExists = true
 					break
 				}
@@ -302,6 +317,32 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 
+	case SettingsMode:
+		if m.settings != nil {
+			settings, cmd := m.settings.Update(msg)
+			m.settings = &settings
+			cmds = append(cmds, cmd)
+		}
+		// Allow ESC to return to chat
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			if keyMsg.String() == "esc" {
+				m.mode = ChatMode
+			}
+		}
+
+	case ProgramsMode:
+		if m.programs != nil {
+			programs, cmd := m.programs.Update(msg)
+			m.programs = &programs
+			cmds = append(cmds, cmd)
+		}
+		// Allow ESC to return to chat
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			if keyMsg.String() == "esc" {
+				m.mode = ChatMode
+			}
+		}
+
 	case ChatMode:
 		// Update prompt (always active in chat mode)
 		var promptCmd tea.Cmd
@@ -324,6 +365,20 @@ func (m Model) View() string {
 	if m.mode == OnboardingMode {
 		if m.onboarding != nil {
 			return m.onboarding.View()
+		}
+	}
+
+	// Show settings if in settings mode
+	if m.mode == SettingsMode {
+		if m.settings != nil {
+			return m.settings.View()
+		}
+	}
+
+	// Show programs if in programs mode
+	if m.mode == ProgramsMode {
+		if m.programs != nil {
+			return m.programs.View()
 		}
 	}
 
@@ -449,9 +504,9 @@ func (m *Model) executeProgramCmd(programID string, params map[string]interface{
 		}
 
 		// Find the program name
-		programName := programID // Fallback to ID
+		programName := programID // Fallback to Name
 		for _, prog := range programs {
-			if prog.ID == programID {
+			if prog.Name == programID {
 				programName = prog.Name
 				break
 			}
@@ -526,12 +581,15 @@ Keyboard Shortcuts:
 		return nil
 
 	case "system:settings":
-		m.statusMsg = "Settings not yet implemented"
+		m.mode = SettingsMode
+		m.statusMsg = ""
 		return nil
 
 	case "system:programs":
-		m.statusMsg = "Fetching available programs..."
-		return m.fetchPrograms()
+		m.mode = ProgramsMode
+		m.programs = NewProgramsModel(m.client) // Reinitialize to refresh
+		m.statusMsg = ""
+		return m.programs.Init()
 
 	// Finance commands - stub implementations
 	case "finance:dashboard":
@@ -671,21 +729,8 @@ func (m *Model) fetchPrograms() tea.Cmd {
 
 		message := "📦 Available Programs:\n\n"
 		for _, program := range programs {
-			message += fmt.Sprintf("• %s (%s)\n", program.Name, program.ID)
+			message += fmt.Sprintf("• %s\n", program.Name)
 			message += fmt.Sprintf("  %s\n", program.Description)
-			message += fmt.Sprintf("  Category: %s\n", program.Category)
-
-			if len(program.Parameters) > 0 {
-				message += "  Parameters:\n"
-				for _, param := range program.Parameters {
-					required := ""
-					if param.Required {
-						required = " (required)"
-					}
-					message += fmt.Sprintf("    - %s (%s)%s: %s\n",
-						param.Name, param.Type, required, param.Description)
-				}
-			}
 			message += "\n"
 		}
 

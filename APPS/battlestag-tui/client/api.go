@@ -95,16 +95,21 @@ func parseResponse(resp *http.Response, target interface{}) error {
 	return nil
 }
 
-// Health checks the API health
+// Health checks the API health (gateway v2)
 func (c *Client) Health() (*models.HealthResponse, error) {
-	resp, err := c.doRequest("GET", "/api/health", nil)
+	resp, err := c.doRequest("GET", "/health", nil)
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("health check failed with status %d", resp.StatusCode)
+	}
 
 	var health models.HealthResponse
-	if err := parseResponse(resp, &health); err != nil {
-		return nil, err
+	if err := json.NewDecoder(resp.Body).Decode(&health); err != nil {
+		return nil, fmt.Errorf("failed to decode health response: %w", err)
 	}
 
 	return &health, nil

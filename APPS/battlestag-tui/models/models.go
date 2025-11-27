@@ -9,11 +9,10 @@ type APIResponse struct {
 	Error   string      `json:"error,omitempty"`
 }
 
-// HealthResponse represents the health check response
+// HealthResponse represents the health check response (gateway v2)
 type HealthResponse struct {
-	Status  string    `json:"status"`
-	Version string    `json:"version"`
-	Time    time.Time `json:"time"`
+	Status         string `json:"status"`
+	ProgramsLoaded int    `json:"programs_loaded"`
 }
 
 // StatsResponse represents system statistics

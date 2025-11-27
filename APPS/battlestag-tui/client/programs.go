@@ -15,13 +15,11 @@ type ProgramParameter struct {
 	Required    bool   `json:"required"`
 }
 
-// ProgramInfo describes a program's metadata
+// ProgramInfo describes a program's metadata (gateway v2)
 type ProgramInfo struct {
-	ID          string             `json:"id"`
-	Name        string             `json:"name"`
-	Description string             `json:"description"`
-	Category    string             `json:"category"`
-	Parameters  []ProgramParameter `json:"parameters"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Executable  string `json:"executable"`
 }
 
 // ProgramExecutionResult is returned by a program execution
@@ -31,18 +29,11 @@ type ProgramExecutionResult struct {
 	Error   string `json:"error,omitempty"`
 }
 
-// ListPrograms fetches all available programs from the gateway
+// ListPrograms fetches all available programs from the gateway (v2)
 func (c *Client) ListPrograms() ([]ProgramInfo, error) {
-	req, err := http.NewRequest("GET", c.BaseURL+"/api/programs/list", nil)
+	resp, err := c.doRequest("GET", "/programs", nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	// Gateway v2 doesn't require authentication
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -51,20 +42,15 @@ func (c *Client) ListPrograms() ([]ProgramInfo, error) {
 	}
 
 	var response struct {
-		Success bool          `json:"success"`
-		Data    []ProgramInfo `json:"data"`
-		Error   string        `json:"error,omitempty"`
+		Count    int           `json:"count"`
+		Programs []ProgramInfo `json:"programs"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	if !response.Success {
-		return nil, fmt.Errorf("API error: %s", response.Error)
-	}
-
-	return response.Data, nil
+	return response.Programs, nil
 }
 
 // ExecuteProgram executes a program with the given parameters

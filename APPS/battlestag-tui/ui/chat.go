@@ -38,6 +38,11 @@ func NewChatModel(apiClient *client.Client) *ChatModel {
 	}
 }
 
+// UpdateClient updates the API client (preserves chat history)
+func (m *ChatModel) UpdateClient(apiClient *client.Client) {
+	m.apiClient = apiClient
+}
+
 // AddUserMessage adds a user message to the conversation
 func (m *ChatModel) AddUserMessage(content string) {
 	m.messages = append(m.messages, ChatMessage{
