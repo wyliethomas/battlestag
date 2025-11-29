@@ -1,5 +1,6 @@
 # Binaries
 battlestag-tui
+battlestag-tui-test
 *.exe
 *.dll
 *.so
