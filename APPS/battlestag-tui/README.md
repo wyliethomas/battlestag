@@ -2,6 +2,7 @@
 
 A Claude Code-style terminal user interface for managing personal finances with AI assistance.
 
+
 ## Features
 
 - **AI-Powered Chat**: Conversational interface powered by local LLM (via Ollama)
