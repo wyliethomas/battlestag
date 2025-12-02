@@ -1,0 +1,54 @@
+# Communication Observer Configuration
+
+# User identity information
+user:
+  name: "Your Name"
+  slack_id: "U12345678"  # Your Slack user ID
+  email: "you@example.com"
+
+# Message queue settings
+queue:
+  type: "filesystem"
+  path: "/tmp/com-observer/queue"  # Directory to store queued messages
+
+# Slack integration settings
+slack:
+  token: "xoxb-your-bot-token-here"
+  channels_include: []  # Empty = all channels, or specify: ["C123456", "C789012"]
+  channels_exclude: []  # Channels to ignore
+  watch_dms: true       # Monitor direct messages
+  sync_interval: "5m"   # How often to sync (e.g., "5m", "1h")
+
+# Gmail integration settings
+gmail:
+  credentials_file: "/path/to/gmail-credentials.json"
+  labels: ["INBOX", "IMPORTANT"]  # Gmail labels to watch
+  sync_interval: "10m"
+
+# Trello integration settings
+trello:
+  api_key: "your-trello-api-key"
+  token: "your-trello-token"
+  boards: ["board-id-1", "board-id-2"]  # Board IDs to monitor
+  sync_interval: "15m"
+
+# Note writer configuration
+notewriter:
+  type: "obsidian"  # "obsidian" or "notion"
+
+  # Obsidian settings (used if type is "obsidian")
+  obsidian:
+    vault_path: "/path/to/obsidian/vault"
+    tasks_file: "Tasks/Action Items.md"  # Relative to vault_path
+
+  # Notion settings (used if type is "notion")
+  notion:
+    token: "your-notion-integration-token"
+    database_id: "your-database-id"
+
+# LLM settings for task extraction
+llm:
+  provider: "anthropic"  # "anthropic", "openai", or "custom"
+  api_key: "your-api-key-here"
+  model: "claude-3-5-sonnet-20241022"
+  endpoint: ""  # Optional: custom endpoint for custom providers

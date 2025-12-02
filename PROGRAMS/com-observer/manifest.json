@@ -1,0 +1,19 @@
+{
+  "name": "com-observer",
+  "description": "Communication channel monitoring system that extracts action items from Slack, Gmail, and Trello using AI and writes them to Obsidian or Notion. This is a background service system - not directly executable. Components: slack connector, gmail connector, trello connector, and notewriter. Designed to run via cron/systemd.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "info": {
+        "type": "string",
+        "description": "Information request about the com-observer system",
+        "enum": [
+          "architecture",
+          "setup",
+          "status"
+        ]
+      }
+    },
+    "required": []
+  }
+}

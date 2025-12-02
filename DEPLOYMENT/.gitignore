@@ -1,0 +1,14 @@
+# Pre-built packages (built with build-packages.sh)
+packages/*.tar.gz
+
+# Temporary files
+*.tmp
+*.backup
+
+# Config files with secrets (use templates instead)
+configs/*.yaml
+!configs/*.yaml.example
+
+# OS files
+.DS_Store
+Thumbs.db
