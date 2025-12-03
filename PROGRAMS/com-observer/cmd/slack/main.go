@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 	"time"
 
@@ -162,8 +163,8 @@ func syncChannel(api *slack.Client, queue *messages.Queue, st *state.State, chan
 		msg := history.Messages[i]
 		lastMessageTS = msg.Timestamp
 
-		// Skip bot messages and messages from the user themselves
-		if msg.BotID != "" || msg.User == userID {
+		// Skip bot messages only (we now process user's own messages for delegation tracking)
+		if msg.BotID != "" {
 			continue
 		}
 
@@ -230,6 +231,31 @@ func syncDMs(api *slack.Client, queue *messages.Queue, st *state.State, userID s
 	return totalCount, nil
 }
 
+// replaceMentions replaces Slack user mentions (<@USERID>) with actual names
+func replaceMentions(api *slack.Client, text string) string {
+	// Find all <@USERID> patterns
+	re := regexp.MustCompile(`<@([A-Z0-9]+)>`)
+
+	return re.ReplaceAllStringFunc(text, func(match string) string {
+		// Extract user ID from <@USERID>
+		userID := match[2 : len(match)-1]
+
+		// Look up user name
+		user, err := api.GetUserInfo(userID)
+		if err != nil {
+			return match // Keep original if lookup fails
+		}
+
+		// Return @name format
+		if user.RealName != "" {
+			return "@" + strings.ToLower(strings.Fields(user.RealName)[0])
+		} else if user.Name != "" {
+			return "@" + user.Name
+		}
+		return match
+	})
+}
+
 // convertSlackMessage converts a Slack message to standard format
 func convertSlackMessage(api *slack.Client, msg slack.Message, channelName, channelID string, threadMessages []slack.Message) messages.Message {
 	// Get author name from user ID
@@ -248,7 +274,7 @@ func convertSlackMessage(api *slack.Client, msg slack.Message, channelName, chan
 	}
 
 	// Build content - include thread messages if present
-	content := msg.Text
+	content := replaceMentions(api, msg.Text) // Replace mentions with names
 	if len(threadMessages) > 1 {
 		var threadTexts []string
 		for _, reply := range threadMessages {
@@ -262,7 +288,8 @@ func convertSlackMessage(api *slack.Client, msg slack.Message, channelName, chan
 						userName = user.Name
 					}
 				}
-				threadTexts = append(threadTexts, fmt.Sprintf("%s: %s", userName, reply.Text))
+				replyText := replaceMentions(api, reply.Text) // Replace mentions in replies too
+				threadTexts = append(threadTexts, fmt.Sprintf("%s: %s", userName, replyText))
 			}
 		}
 		content = strings.Join(threadTexts, "\n")

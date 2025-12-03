@@ -20,7 +20,7 @@ type Writer interface {
 func NewWriter(cfg *config.Config) (Writer, error) {
 	switch cfg.NoteWriter.Type {
 	case "obsidian":
-		return NewObsidianWriter(cfg.NoteWriter.Obsidian)
+		return NewObsidianWriter(cfg.NoteWriter.Obsidian, cfg.User)
 	case "notion":
 		return NewNotionWriter(cfg.NoteWriter.Notion)
 	default:

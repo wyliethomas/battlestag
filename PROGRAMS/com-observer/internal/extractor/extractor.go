@@ -62,10 +62,14 @@ func (e *Extractor) buildPrompt(userName string, msgs []messages.Message) string
 
 	sb.WriteString(fmt.Sprintf(`You are analyzing messages for %s to extract action items.
 
-Your task is to identify any actions, tasks, or commitments that %s needs to take based on these messages.
+Your task is to identify any actions, tasks, or commitments mentioned in these messages.
 
 Rules:
-- Only extract action items where %s is the one who needs to do something
+- Extract ALL actionable items mentioned in the messages
+- For each task, identify WHO is being asked to do it (the assignee)
+- If %s is the one being asked, set assignee to "%s"
+- If someone else is being asked, set assignee to their name/username
+- If unclear who should do it, set assignee to "unassigned"
 - Ignore completed tasks or things already done
 - Include enough context to understand what needs to be done
 - Be specific but concise
@@ -74,7 +78,8 @@ Return your response as a JSON array of tasks with this format:
 [
   {
     "description": "Brief description of what needs to be done",
-    "context": "Additional context from the conversation"
+    "context": "Additional context from the conversation",
+    "assignee": "Name of person who should do this task"
   }
 ]
 
@@ -293,6 +298,7 @@ func (e *Extractor) parseTasksJSON(text string) ([]messages.Task, error) {
 	var rawTasks []struct {
 		Description string `json:"description"`
 		Context     string `json:"context"`
+		Assignee    string `json:"assignee"`
 	}
 
 	if err := json.Unmarshal([]byte(jsonStr), &rawTasks); err != nil {
@@ -305,6 +311,7 @@ func (e *Extractor) parseTasksJSON(text string) ([]messages.Task, error) {
 		tasks[i] = messages.Task{
 			Description: rt.Description,
 			Context:     rt.Context,
+			Assignee:    rt.Assignee,
 		}
 	}
 

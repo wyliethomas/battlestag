@@ -19,6 +19,7 @@ type Message struct {
 type Task struct {
 	Description string    `json:"description"` // What needs to be done
 	Context     string    `json:"context"`     // Additional context from the conversation
+	Assignee    string    `json:"assignee"`    // Who is being asked to do this task
 	Source      string    `json:"source"`      // "slack" | "gmail" | "trello"
 	Channel     string    `json:"channel"`     // Where it came from
 	Author      string    `json:"author"`      // Who mentioned it
