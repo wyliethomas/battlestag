@@ -1,0 +1,14 @@
+{
+  "extraKnownMarketplaces": {
+    "pxp": {
+      "source": {
+        "source": "git",
+        "url": "git@github.com:your-org/pxp-plugin-marketplace.git"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "pxp-tools@pxp": true
+  }
+}
+

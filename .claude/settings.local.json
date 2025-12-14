@@ -31,7 +31,10 @@
       "Bash(./programs/time/time:*)",
       "Bash(lsof:*)",
       "Bash(xargs kill:*)",
-      "Bash(pgrep:*)"
+      "Bash(pgrep:*)",
+      "Bash(bash -n:*)",
+      "Bash(ssh:*)",
+      "Bash(scp:*)"
     ],
     "deny": [],
     "ask": []
