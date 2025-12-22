@@ -34,7 +34,8 @@
       "Bash(pgrep:*)",
       "Bash(bash -n:*)",
       "Bash(ssh:*)",
-      "Bash(scp:*)"
+      "Bash(scp:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []

@@ -55,6 +55,9 @@ func NewModel(apiClient *client.Client, cfg *config.Config, showOnboarding bool)
 		onboarding = NewOnboardingModel()
 	}
 
+	// For now, use hardcoded API key (TODO: make configurable)
+	apiKey := "test-api-key-12345"
+
 	return Model{
 		client:     apiClient,
 		config:     cfg,
@@ -62,7 +65,7 @@ func NewModel(apiClient *client.Client, cfg *config.Config, showOnboarding bool)
 		onboarding: onboarding,
 		chat:       NewChatModel(apiClient),
 		prompt:     NewPromptModel(),
-		palette:    NewPaletteModel(),
+		palette:    NewPaletteModel(cfg.AgentGateway.URL, apiKey),
 		settings:   NewSettingsModel(cfg),
 		programs:   NewProgramsModel(apiClient),
 		connected:  true, // Start optimistic

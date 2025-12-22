@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -23,8 +24,15 @@ type PaletteModel struct {
 }
 
 // NewPaletteModel creates a new command palette
-func NewPaletteModel() *PaletteModel {
+func NewPaletteModel(apiURL, apiKey string) *PaletteModel {
 	registry := NewCommandRegistry()
+
+	// Load programs from API (silently fail if API is unavailable)
+	if err := registry.LoadProgramsFromAPI(apiURL, apiKey); err != nil {
+		log.Printf("Warning: Failed to load programs from API: %v", err)
+		// Continue with built-in commands only
+	}
+
 	return &PaletteModel{
 		registry: registry,
 		commands: registry.GetRootCommands(),

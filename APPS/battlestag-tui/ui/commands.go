@@ -1,6 +1,25 @@
 package ui
 
-import "strings"
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strings"
+)
+
+// ProgramInfo represents a program from the API
+type ProgramInfo struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Category    string `json:"category"`
+}
+
+// ProgramsListResponse is the API response for /api/programs/list
+type ProgramsListResponse struct {
+	Success bool          `json:"success"`
+	Data    []ProgramInfo `json:"data"`
+}
 
 // CommandType represents the type of command
 type CommandType int
@@ -278,4 +297,72 @@ func (r *CommandRegistry) FilterCommands(input string) []Command {
 func (r *CommandRegistry) GetCommand(key string) (Command, bool) {
 	cmd, exists := r.commands[key]
 	return cmd, exists
+}
+
+// LoadProgramsFromAPI queries the agent-gateway for available programs
+// and registers them as commands dynamically
+func (r *CommandRegistry) LoadProgramsFromAPI(apiURL, apiKey string) error {
+	// Create request
+	req, err := http.NewRequest("GET", apiURL+"/api/programs/list", nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Add API key header
+	req.Header.Set("X-API-Key", apiKey)
+
+	// Execute request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to fetch programs: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Parse response
+	var programsResp ProgramsListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&programsResp); err != nil {
+		return fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if !programsResp.Success {
+		return fmt.Errorf("API returned success=false")
+	}
+
+	// Track which categories we've added
+	addedCategories := make(map[string]bool)
+
+	// Register each program as a command
+	for _, prog := range programsResp.Data {
+		// Add category if not already present
+		if !addedCategories[prog.Category] {
+			categoryKey := prog.Category
+			// Check if category already exists
+			if _, exists := r.commands[categoryKey]; !exists {
+				// Add new category
+				categoryCmd := Command{
+					Name:        "📦 " + strings.Title(prog.Category),
+					Key:         categoryKey,
+					Description: strings.Title(prog.Category) + " programs and modules",
+					Type:        CategoryCommand,
+				}
+				r.commands[categoryKey] = categoryCmd
+				r.rootKeys = append(r.rootKeys, categoryKey)
+			}
+			addedCategories[prog.Category] = true
+		}
+
+		// Register program as command
+		commandKey := prog.Category + ":" + prog.ID
+		cmd := Command{
+			Name:        prog.Name,
+			Key:         commandKey,
+			Description: prog.Description,
+			Type:        ActionCommand,
+			Category:    prog.Category,
+		}
+		r.commands[commandKey] = cmd
+	}
+
+	return nil
 }

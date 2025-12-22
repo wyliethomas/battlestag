@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# bstag-enmod - Enable a BATTLESTAG module
+# Usage: bstag-enmod <module_name>
+
+set -euo pipefail
+
+BSTAG_HOME="${BSTAG_HOME:-$HOME/.bstag}"
+AVAILABLE="$BSTAG_HOME/modules-available"
+ENABLED="$BSTAG_HOME/modules-enabled"
+CUSTOM="$BSTAG_HOME/modules-custom"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Print usage
+usage() {
+    cat << EOF
+Usage: bstag-enmod <module_name>
+
+Enable a BATTLESTAG module by creating a symlink in modules-enabled/.
+
+Examples:
+  bstag-enmod csv_insight
+  bstag-enmod improve_writing
+  bstag-enmod my_custom_module
+
+Available modules:
+EOF
+    find "$AVAILABLE" -name "*.sh" -type f 2>/dev/null | \
+        sed "s|$AVAILABLE/||" | \
+        sed 's|^tier[0-9]/[^/]*/||' | \
+        sed 's|\.sh$||' | \
+        sort | \
+        sed 's/^/  /'
+
+    echo ""
+    echo "Custom modules:"
+    if [[ -d "$CUSTOM" ]]; then
+        find "$CUSTOM" -name "*.sh" -type f 2>/dev/null | \
+            sed "s|$CUSTOM/||" | \
+            sed 's|\.sh$||' | \
+            sort | \
+            sed 's/^/  /' || echo "  (none)"
+    else
+        echo "  (none)"
+    fi
+}
+
+# Main
+module_name="${1:-}"
+
+if [[ -z "$module_name" ]]; then
+    echo -e "${RED}Error: Module name required${NC}" >&2
+    echo ""
+    usage
+    exit 1
+fi
+
+# Ensure directories exist
+mkdir -p "$ENABLED"
+
+# Search for module in modules-available/
+module_file=$(find "$AVAILABLE" -name "${module_name}.sh" -type f 2>/dev/null | head -1)
+
+# Check custom/ too
+if [[ -z "$module_file" ]] && [[ -f "$CUSTOM/${module_name}.sh" ]]; then
+    module_file="$CUSTOM/${module_name}.sh"
+fi
+
+if [[ -z "$module_file" ]]; then
+    echo -e "${RED}Error: Module '$module_name' not found${NC}" >&2
+    echo ""
+    echo "Available modules:"
+    find "$AVAILABLE" -name "*.sh" -type f 2>/dev/null | \
+        sed "s|$AVAILABLE/||" | \
+        sed 's|^tier[0-9]/[^/]*/||' | \
+        sed 's|\.sh$||' | \
+        sort | \
+        sed 's/^/  /'
+    exit 1
+fi
+
+# Create symlink
+link_target="$ENABLED/${module_name}.sh"
+
+if [[ -L "$link_target" ]]; then
+    echo -e "${YELLOW}Module '$module_name' is already enabled${NC}"
+    echo "Link: $(readlink "$link_target")"
+    exit 0
+fi
+
+ln -s "$module_file" "$link_target"
+
+echo -e "${GREEN}✓ Module '$module_name' enabled${NC}"
+echo ""
+echo "Source: $module_file"
+echo "Link:   $link_target"
+
+# Show metadata
+if grep -q "^# MODULE:" "$module_file" 2>/dev/null; then
+    echo ""
+    echo "Module Info:"
+    grep "^# MODULE:" "$module_file" | sed 's/^# MODULE: /  Module: /'
+    grep "^# TIER:" "$module_file" | sed 's/^# TIER: /  Tier:   /' || echo "  Tier:   1"
+    grep "^# DESCRIPTION:" "$module_file" | sed 's/^# DESCRIPTION: /  Desc:   /'
+fi
+
+echo ""
+echo -e "${GREEN}Done! Module is now available.${NC}"

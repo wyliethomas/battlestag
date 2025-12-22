@@ -107,6 +107,36 @@ func main() {
 		log.Println("Registered program: lab-monitor")
 	}
 
+	// Auto-discover and register modules from ~/.bstag/modules-enabled/
+	// This scans only enabled modules (symlinks created by bstag-enmod)
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Printf("Warning: Could not get home directory: %v", err)
+		homeDir = os.Getenv("HOME")
+	}
+	modulesDir := homeDir + "/.bstag/modules-enabled"
+
+	// Check if .bstag is installed
+	if _, err := os.Stat(modulesDir); os.IsNotExist(err) {
+		log.Printf("Info: BSTAG module system not installed at %s", modulesDir)
+		log.Printf("Info: Run './SCRIPTS/install.sh' to install")
+	} else {
+		moduleScanner := programs.NewModuleScanner(modulesDir)
+		discoveredModules, err := moduleScanner.DiscoverModules()
+		if err != nil {
+			log.Printf("Warning: Failed to scan modules directory: %v", err)
+		} else {
+			log.Printf("Discovered %d enabled modules in %s", len(discoveredModules), modulesDir)
+			for _, module := range discoveredModules {
+				if err := programsRegistry.Register(module); err != nil {
+					log.Printf("Warning: Failed to register module %s: %v", module.Info().ID, err)
+				} else {
+					log.Printf("Registered module: %s (%s)", module.Info().ID, module.Info().Category)
+				}
+			}
+		}
+	}
+
 	programsHandler := handlers.NewProgramsHandler(programsRegistry)
 	log.Printf("Programs registry initialized (%d programs)", len(programsRegistry.List()))
 
