@@ -156,10 +156,30 @@ else
 fi
 echo -e "${GREEN}✓ Commands ready${NC}"
 
+# Copy config files
+echo ""
+echo "Step 6: Setting up configuration..."
+if [[ -d "$SCRIPT_DIR/config" ]]; then
+    # Copy example configs (don't overwrite existing)
+    if [[ ! -f "$BSTAG_HOME/config/llm.conf" ]] && [[ -f "$SCRIPT_DIR/config/llm.conf.example" ]]; then
+        cp "$SCRIPT_DIR/config/llm.conf.example" "$BSTAG_HOME/config/"
+        echo "  Installed llm.conf.example (copy to llm.conf and configure)"
+    elif [[ -f "$BSTAG_HOME/config/llm.conf" ]]; then
+        echo "  Preserved existing llm.conf"
+    fi
+
+    # Copy config README
+    if [[ -f "$SCRIPT_DIR/config/README.md" ]]; then
+        cp "$SCRIPT_DIR/config/README.md" "$BSTAG_HOME/config/"
+        echo "  Installed config/README.md"
+    fi
+fi
+echo -e "${GREEN}✓ Configuration files ready${NC}"
+
 # Create README files (only if not updating)
 if [[ "$UPDATE_MODE" == "false" ]] || [[ ! -f "$BSTAG_HOME/README.md" ]]; then
     echo ""
-    echo "Step 6: Creating documentation..."
+    echo "Step 7: Creating documentation..."
 
     cat > "$BSTAG_HOME/README.md" << 'EOF'
 # BATTLESTAG Module System
@@ -258,7 +278,7 @@ fi
 
 # Add to PATH
 echo ""
-echo "Step 7: Configuring PATH..."
+echo "Step 8: Configuring PATH..."
 
 # Detect shell
 SHELL_RC=""

@@ -1,0 +1,256 @@
+#!/usr/bin/env bash
+# bstag-config - BATTLESTAG Configuration Manager
+#
+# Manage module configuration settings interactively
+
+set -euo pipefail
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+BSTAG_HOME="${BSTAG_HOME:-$HOME/.bstag}"
+CONFIG_FILE="$BSTAG_HOME/config/llm.conf"
+
+# Ensure config directory exists
+mkdir -p "$BSTAG_HOME/config"
+
+# Create config file if it doesn't exist
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    echo -e "${YELLOW}Creating new config file...${NC}"
+
+    # Copy example if available
+    if [[ -f "$BSTAG_HOME/config/llm.conf.example" ]]; then
+        cp "$BSTAG_HOME/config/llm.conf.example" "$CONFIG_FILE"
+    else
+        # Create minimal config
+        cat > "$CONFIG_FILE" << 'EOF'
+#!/usr/bin/env bash
+# BATTLESTAG Configuration
+# Edit this file to configure your modules
+
+# Tier 1 (Local LLM)
+LLM_ENDPOINT="http://192.168.1.232:11434/v1"
+LLM_MODEL="hermes3:8b"
+
+# Tier 2 (Cloud LLM)
+TIER2_PROVIDER="anthropic"
+ANTHROPIC_API_KEY=""
+
+# Obsidian Integration
+OBSIDIAN_VAULT_PATH=""
+EOF
+    fi
+    chmod 600 "$CONFIG_FILE"
+    echo -e "${GREEN}✓ Config file created: $CONFIG_FILE${NC}"
+fi
+
+# Get current config value
+get_config() {
+    local key="$1"
+    local value
+
+    # Source config and get value
+    value=$(source "$CONFIG_FILE" 2>/dev/null && echo "${!key:-}")
+    echo "$value"
+}
+
+# Set config value
+set_config() {
+    local key="$1"
+    local value="$2"
+
+    # Escape only ampersand for sed (slash is safe with | delimiter)
+    local escaped_value
+    escaped_value=$(echo "$value" | sed 's/&/\\&/g')
+
+    # Check if key exists
+    if grep -q "^${key}=" "$CONFIG_FILE"; then
+        # Update existing key
+        sed -i "s|^${key}=.*|${key}=\"${escaped_value}\"|" "$CONFIG_FILE"
+    else
+        # Add new key
+        echo "${key}=\"${escaped_value}\"" >> "$CONFIG_FILE"
+    fi
+
+    echo -e "${GREEN}✓ Set ${key}${NC}"
+}
+
+# Show current configuration
+show_config() {
+    echo -e "${BLUE}=========================================${NC}"
+    echo -e "${BLUE}   BATTLESTAG Configuration${NC}"
+    echo -e "${BLUE}=========================================${NC}"
+    echo ""
+    echo -e "${CYAN}Config file:${NC} $CONFIG_FILE"
+    echo ""
+
+    # Source config
+    if [[ -f "$CONFIG_FILE" ]]; then
+        source "$CONFIG_FILE"
+    fi
+
+    echo -e "${YELLOW}Tier 1 (Local LLM):${NC}"
+    echo "  LLM_ENDPOINT     = ${LLM_ENDPOINT:-not set}"
+    echo "  LLM_MODEL        = ${LLM_MODEL:-not set}"
+    echo ""
+
+    echo -e "${YELLOW}Tier 2 (Cloud LLM):${NC}"
+    echo "  TIER2_PROVIDER   = ${TIER2_PROVIDER:-not set}"
+    if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+        echo "  ANTHROPIC_API_KEY = ${ANTHROPIC_API_KEY:0:12}... (configured)"
+    else
+        echo "  ANTHROPIC_API_KEY = not set"
+    fi
+    if [[ -n "${OPENAI_API_KEY:-}" ]]; then
+        echo "  OPENAI_API_KEY    = ${OPENAI_API_KEY:0:12}... (configured)"
+    else
+        echo "  OPENAI_API_KEY    = not set"
+    fi
+    echo ""
+
+    echo -e "${YELLOW}Module Settings:${NC}"
+    echo "  OBSIDIAN_VAULT_PATH = ${OBSIDIAN_VAULT_PATH:-not set}"
+    echo ""
+
+    echo -e "${BLUE}=========================================${NC}"
+}
+
+# Interactive configuration
+interactive_config() {
+    echo -e "${BLUE}=========================================${NC}"
+    echo -e "${BLUE}   Interactive Configuration${NC}"
+    echo -e "${BLUE}=========================================${NC}"
+    echo ""
+
+    # Obsidian vault path
+    echo -e "${CYAN}Obsidian Vault Path${NC}"
+    echo "  Used by: youtube_to_obsidian module"
+    echo "  Current: $(get_config OBSIDIAN_VAULT_PATH)"
+    echo ""
+    read -p "Enter vault path (or press Enter to skip): " vault_path
+
+    if [[ -n "$vault_path" ]]; then
+        # Expand tilde
+        vault_path="${vault_path/#\~/$HOME}"
+
+        # Check if directory exists
+        if [[ -d "$vault_path" ]]; then
+            set_config "OBSIDIAN_VAULT_PATH" "$vault_path"
+        else
+            echo -e "${YELLOW}Warning: Directory does not exist: $vault_path${NC}"
+            read -p "Set anyway? (y/N): " confirm
+            if [[ "$confirm" =~ ^[Yy]$ ]]; then
+                set_config "OBSIDIAN_VAULT_PATH" "$vault_path"
+            fi
+        fi
+    fi
+
+    echo ""
+    echo -e "${GREEN}Configuration saved!${NC}"
+}
+
+# Edit config file directly
+edit_config() {
+    if command -v $EDITOR &>/dev/null; then
+        $EDITOR "$CONFIG_FILE"
+    elif command -v nano &>/dev/null; then
+        nano "$CONFIG_FILE"
+    elif command -v vim &>/dev/null; then
+        vim "$CONFIG_FILE"
+    else
+        echo -e "${RED}No editor found. Set \$EDITOR or install nano/vim${NC}"
+        echo "Config file location: $CONFIG_FILE"
+        return 1
+    fi
+}
+
+# Main command dispatcher
+case "${1:-}" in
+    show|list)
+        show_config
+        ;;
+    set)
+        if [[ $# -lt 3 ]]; then
+            echo "Usage: bstag-config set <KEY> <VALUE>"
+            echo "Example: bstag-config set OBSIDIAN_VAULT_PATH ~/Documents/MyVault"
+            exit 1
+        fi
+        set_config "$2" "$3"
+        ;;
+    get)
+        if [[ $# -lt 2 ]]; then
+            echo "Usage: bstag-config get <KEY>"
+            exit 1
+        fi
+        get_config "$2"
+        ;;
+    edit)
+        edit_config
+        ;;
+    setup|configure)
+        interactive_config
+        ;;
+    -h|--help|help)
+        cat << EOF
+bstag-config - BATTLESTAG Configuration Manager
+
+USAGE:
+  bstag-config [COMMAND]
+
+COMMANDS:
+  show              Show current configuration
+  setup             Interactive configuration wizard
+  set <KEY> <VALUE> Set a configuration value
+  get <KEY>         Get a configuration value
+  edit              Edit config file directly
+  help              Show this help
+
+EXAMPLES:
+  # View current config
+  bstag-config show
+
+  # Set Obsidian vault path
+  bstag-config set OBSIDIAN_VAULT_PATH ~/Documents/MyVault
+
+  # Interactive setup
+  bstag-config setup
+
+  # Edit config manually
+  bstag-config edit
+
+  # Get specific value
+  bstag-config get OBSIDIAN_VAULT_PATH
+
+CONFIGURATION FILE:
+  Location: ~/.bstag/config/llm.conf
+  Format: KEY="value"
+
+COMMON SETTINGS:
+  OBSIDIAN_VAULT_PATH      - Path to Obsidian vault (for youtube_to_obsidian)
+  LLM_ENDPOINT             - Local LLM endpoint (Tier 1)
+  LLM_MODEL                - Local LLM model name (Tier 1)
+  TIER2_PROVIDER           - Cloud provider (anthropic/openai/google)
+  ANTHROPIC_API_KEY        - Claude API key (Tier 2)
+  OPENAI_API_KEY           - OpenAI API key (Tier 2)
+
+For more info: https://github.com/yourusername/battlestag-bot
+EOF
+        ;;
+    "")
+        # No command - show current config
+        show_config
+        echo ""
+        echo "Run 'bstag-config setup' for interactive configuration"
+        echo "Run 'bstag-config help' for more options"
+        ;;
+    *)
+        echo -e "${RED}Unknown command: $1${NC}"
+        echo "Run 'bstag-config help' for usage"
+        exit 1
+        ;;
+esac

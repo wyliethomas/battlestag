@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+# BATTLESTAG LLM Configuration File
+# Copy to ~/.bstag/config/llm.conf and configure your settings
+
+# ============================================
+# TIER 1: Local LLM (Free, Private)
+# ============================================
+# These settings are for your local Ollama/LM Studio instance
+
+# Endpoint for local LLM (Ollama default: http://localhost:11434/v1)
+LLM_ENDPOINT="http://192.168.1.232:11434/v1"
+
+# Model name (e.g., hermes3:8b, qwen2.5-coder:7b, llama3.1:8b)
+LLM_MODEL="hermes3:8b"
+
+# Request timeout in seconds
+LLM_TIMEOUT="60"
+
+# Max tokens for response
+LLM_MAX_TOKENS="2000"
+
+# Temperature (0.0-1.0, lower = more focused)
+LLM_TEMPERATURE="0.7"
+
+# ============================================
+# TIER 2: Cloud LLM (Paid, High Quality)
+# ============================================
+# Choose one provider and configure its settings
+
+# Provider selection: anthropic, openai, google, azure, openrouter
+TIER2_PROVIDER="anthropic"
+
+# Common Tier 2 settings
+TIER2_MAX_TOKENS="4096"
+TIER2_TEMPERATURE="0.7"
+
+# --------------------------------------------
+# Anthropic (Claude) - Recommended
+# --------------------------------------------
+# Get API key from: https://console.anthropic.com/settings/keys
+# Pricing: ~$3/million input tokens, ~$15/million output tokens
+
+ANTHROPIC_API_KEY=""  # Your API key here
+ANTHROPIC_ENDPOINT="https://api.anthropic.com/v1"
+ANTHROPIC_MODEL="claude-sonnet-4-5-20250929"  # or claude-opus-4, claude-sonnet-3-5-20241022
+
+# --------------------------------------------
+# OpenAI (GPT)
+# --------------------------------------------
+# Get API key from: https://platform.openai.com/api-keys
+# Pricing: ~$2.50/million input tokens, ~$10/million output tokens
+
+OPENAI_API_KEY=""  # Your API key here
+OPENAI_ENDPOINT="https://api.openai.com/v1"
+OPENAI_MODEL="gpt-4o"  # or gpt-4o-mini, gpt-4-turbo
+
+# --------------------------------------------
+# Google (Gemini)
+# --------------------------------------------
+# Get API key from: https://ai.google.dev/
+# Pricing: Free tier available, then pay-as-you-go
+
+GOOGLE_API_KEY=""  # Your API key here
+GOOGLE_ENDPOINT="https://generativelanguage.googleapis.com/v1beta"
+GOOGLE_MODEL="gemini-1.5-pro"  # or gemini-1.5-flash, gemini-2.0-flash-exp
+
+# --------------------------------------------
+# Azure OpenAI
+# --------------------------------------------
+# Get credentials from: https://portal.azure.com/
+# Requires Azure subscription and OpenAI resource
+
+AZURE_API_KEY=""  # Your Azure API key
+AZURE_ENDPOINT=""  # Your Azure endpoint (e.g., https://your-resource.openai.azure.com)
+AZURE_MODEL="gpt-4"  # Model you deployed
+AZURE_DEPLOYMENT=""  # Your deployment name
+
+# --------------------------------------------
+# OpenRouter (Access Multiple Providers)
+# --------------------------------------------
+# Get API key from: https://openrouter.ai/keys
+# Pricing: Varies by model, typically $3-15/million tokens
+
+OPENROUTER_API_KEY=""  # Your OpenRouter API key
+OPENROUTER_ENDPOINT="https://openrouter.ai/api/v1"
+OPENROUTER_MODEL="anthropic/claude-sonnet-4-5"  # or openai/gpt-4o, google/gemini-pro-1.5
+
+# ============================================
+# USAGE NOTES
+# ============================================
+#
+# 1. Copy this file to ~/.bstag/config/llm.conf
+# 2. Uncomment and fill in API keys for your chosen provider(s)
+# 3. Set TIER2_PROVIDER to your preferred cloud provider
+# 4. Test with: bstag-module info improve_writing
+#
+# Privacy Note:
+# - Tier 1 modules only use local LLM (data stays private)
+# - Tier 2 modules send data to cloud providers
+# - Choose providers based on your privacy/compliance needs
+#
+# Cost Note:
+# - Tier 1 is completely free (uses local resources)
+# - Tier 2 costs ~$0.01-0.10 per module execution
+# - Most modules use 1,000-5,000 tokens per call
+#
+# Examples:
+# - Improve short text: ~$0.01-0.02 (Tier 2)
+# - Extract wisdom from article: ~$0.03-0.05 (Tier 2)
+# - Code review: ~$0.05-0.10 (Tier 2)
+
+
+# ============================================
+# OBSIDIAN INTEGRATION
+# ============================================
+# Path to your Obsidian vault for youtube_to_obsidian module
+OBSIDIAN_VAULT_PATH="$HOME/Documents/ObsidianVault"  # Change to your vault path
+

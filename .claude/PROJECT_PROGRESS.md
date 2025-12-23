@@ -41,6 +41,59 @@ Key insight: Apache's proven pattern handles hundreds of modules elegantly!
 
 ## Completed This Session (2025-12-22)
 
+**Phase 6: Multi-Provider Tier 2 System - COMPLETE ✅**
+- Implemented provider abstraction layer in utilities/llm.sh
+  - `util.llm.query_big()` - Routes to configured provider
+  - Provider-specific functions for each API:
+    - `util.llm._query_anthropic()` - Claude API (x-api-key header)
+    - `util.llm._query_openai()` - GPT API (Bearer token)
+    - `util.llm._query_google()` - Gemini API (different format)
+    - `util.llm._query_azure()` - Azure OpenAI (api-key header)
+    - `util.llm._query_openrouter()` - OpenRouter (multi-model access)
+- Configuration system with TIER2_PROVIDER selection
+- Created comprehensive config template (config/llm.conf.example)
+  - All 5 providers documented with pricing, privacy notes
+  - Example values for each provider
+  - Security best practices
+- Created detailed configuration guide (config/README.md)
+  - Provider selection guide with pros/cons
+  - Privacy & compliance section
+  - Cost examples and monthly estimates
+  - Troubleshooting section
+- Updated util.llm.tier_info() to show all providers
+  - Shows which providers are configured (✓/✗)
+  - Displays active provider and models
+  - Clear visual hierarchy
+- Updated install.sh to copy config files
+  - Preserves existing llm.conf on update
+  - Copies example and README to ~/.bstag/config/
+- Syntax validated - all code working
+
+**User Requirements Met:**
+✅ "I would like any user of bstag to be able to configure for anthropic or openai or google or microsoft"
+✅ Privacy-focused: Direct provider APIs (no proxy like OpenRouter by default)
+✅ User choice: Can select provider via config file or env var
+✅ Easy configuration: Example template with clear documentation
+
+**Next:** Test with real Anthropic API key
+
+**Phase 5: Tiered Module System - COMPLETE ✅**
+- Enhanced utilities/llm.sh with tier support
+  - `util.llm.query_small()` - Tier 1 (local LLM, free)
+  - `util.llm.query_big()` - Tier 2 (Claude API, paid)
+  - Config loading from ~/.bstag/config/llm.conf
+  - `util.llm.tier_info()` - Show tier configuration
+- Built Tier 1 module: improve_writing.sh
+  - Text improvement with local LLM
+  - Grammar, clarity, style fixes
+  - Fast, free, simple prompts
+- Built Tier 2 module: extract_wisdom.sh
+  - Fabric-inspired deep analysis
+  - Extracts: IDEAS, INSIGHTS, QUOTES, HABITS, FACTS
+  - Uses Claude API for quality synthesis
+- Both modules show in `bstag-module available` with tier indicators
+- System ready for LLM configuration and testing
+
 **Phase 4: Remote Installation Testing - COMPLETE ✅**
 - Successfully installed on battlestag server via SSH
 - Verified complete directory structure in ~/.bstag/
